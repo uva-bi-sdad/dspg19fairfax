@@ -1,0 +1,94 @@
+---
+title: "OSM Obesity Data EDA"
+author: "Quinton Neville"
+date: "6/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#To run the file you'll need to install all the packages here, in this order
+
+#Packages
+#install.packages("dplyr") # new  version
+#install.packages(c("snakecase", "janitor")) #tidy names
+#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+#install.packages("pillar") #Dependency for patchwork
+#install.packages(c("osmdata", "ggmap", "sp"))
+#install.packages(c("sp", "sf"))
+library(tidyverse)
+library(janitor)
+library(patchwork)
+library(ggridges) #Multi panel density plots
+library(osmdata)
+library(ggmap)
+library(purrr)
+library(sp)
+library(sf)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = TRUE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#1. Explore OSM Data for Obesity Features
+
+####a. Playgrounds  
+
+Grab the data.  
+```{r warning = FALSE}
+#Read in playground data
+play.df <- getbb("fairfax county", format_out = "polygon") %>%
+  opq() %>%
+  add_osm_feature(key = "leisure", value = "playground") %>%
+  osmdata_sf()
+
+#Pull latitude and longitude
+play.lat.long.df <- do.call(rbind, st_geometry(play.df$osm_points)) %>% 
+    as_tibble() %>% setNames(c("longitude", "latitude"))
+```
+
+Plot with `ggmap()`.  
+```{r warning = FALSE}
+#Set Base Fairfax Map
+#Boundary and outline of Fairfax County
+fairfax.box <- getbb("fairfax county")
+fairfax.boundary <- getbb("fairfax county", format_out = "polygon") %>%
+  as.tibble() %>%
+  rename(longitude = `V1`, latitude = `V2`)
+
+#Grab the map info (many varieties)
+fairfax.map <- get_map(location = fairfax.box, source="stamen", maptype="watercolor", crop = TRUE)
+
+#ggmap and ggplot map and boundary
+ff.map <- ggmap(fairfax.map) +
+  geom_polygon(data = fairfax.boundary, aes(x = longitude, y = latitude), colour = "black", size = 1, alpha = 0.1) +
+  labs(
+    x = "Longitude",
+    y = "Latitude",
+    title = "Fairfax County"
+  )
+
+#Add locations of playgrounds
+playground.gg <- ff.map +
+  geom_point(data = play.lat.long.df, aes(x = longitude, y = latitude),
+             size = 0.1, colour = "red", alpha = 0.25) + 
+  geom_density_2d(data = play.lat.long.df, aes(x = longitude, y = latitude),
+                  colour = "purple", alpha = 0.5)
+playground.gg
+```
