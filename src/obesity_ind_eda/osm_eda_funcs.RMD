@@ -24,7 +24,6 @@ knitr::opts_knit$set(echo = TRUE,
 library(tidyverse) 
 library(janitor)   #Clean names
 library(patchwork) #Multi panel plots
-library(ggridges)  #Multi panel density plots
 library(osmdata)   #OSM
 library(ggmap)     #Tidy gg maps
 library(purrr)     #Map functions
