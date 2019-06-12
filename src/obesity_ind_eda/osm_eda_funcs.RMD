@@ -49,7 +49,7 @@ theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.posi
 options(scipen = 999999)
 ```
 
-#1. Functions to Read/Write OSM Data
+#1. Functions to Read/Write OSM Data#
 
 ##a. Read and output data frame for visualization/storage
 
@@ -169,7 +169,7 @@ osm_filepath_gen(data.folder = "original/osm",
 #writes.csv(osm_to_df(), osm_filepath_gen())
 ```
 
-#2. Functions for Spatial Fairfax EDA-OSM plots
+#2. Functions for Spatial Fairfax EDA-OSM plots#
 
 ##i. Set your base (background) Fairfax Map
 
@@ -270,7 +270,7 @@ osm_line_plot <- function(ff.map, obj, value) {
 osm_line_plot(ff.map, obj, "Hiking Trails")
 ```
 
-#3. Flow of Using Functions together
+#3. Flow of Using Functions together#
 
 
 Total flow playground example (plus use of filepath function to save plot as .jpg for later).  
