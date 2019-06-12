@@ -17,20 +17,19 @@ knitr::opts_knit$set(echo = TRUE,
 #Packages
 #install.packages("dplyr") # new  version
 #install.packages(c("snakecase", "janitor")) #tidy names
-#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
 #install.packages("pillar") #Dependency for patchwork
-#install.packages(c("osmdata", "ggmap", "sp"))
+#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+#install.packages(c("osmdata", "ggmap"))
 #install.packages(c("sp", "sf"))
-library(tidyverse)
-#library(dplyr)
-library(janitor)
-library(patchwork)
-library(ggridges) #Multi panel density plots
-library(osmdata)
-library(ggmap)
-library(purrr)
-library(sp)
-library(sf)
+library(tidyverse) 
+library(janitor)   #Clean names
+library(patchwork) #Multi panel plots
+library(ggridges)  #Multi panel density plots
+library(osmdata)   #OSM
+library(ggmap)     #Tidy gg maps
+library(purrr)     #Map functions
+library(sp)        #Spatial forms
+library(sf)        #Spatial forms
 
 #Controlling figure output in markdown
 knitr::opts_chunk$set(
@@ -66,7 +65,7 @@ Here the functions takes 3 inputs:
 
 Steps:  
 
-1.  Read in the data with desired inputs key and value into `read.df`  
+1.  Read in the data with desired inputs key and value into `read.df`
 
 2. If the type is point, manipulate `sf` read.df object into the tidy `lat.long.df` with desired grouping/format for points.  
 
