@@ -2,7 +2,9 @@
 title: "OSM Obesity Data EDA"
 author: "Quinton Neville"
 date: "6/11/2019"
-output: html_document
+output:
+  github_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning = FALSE}
