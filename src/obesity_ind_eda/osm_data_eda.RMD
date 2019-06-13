@@ -38,7 +38,7 @@ knitr::opts_chunk$set(
 #  fig.asp = .5,
   out.width = "90%",
 #  out.height = 
-  cache = TRUE
+  cache = FALSE
 )
 
 #Set Theme for ggplot2
