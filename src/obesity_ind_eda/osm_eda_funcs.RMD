@@ -37,7 +37,7 @@ knitr::opts_chunk$set(
 #  fig.asp = .5,
   out.width = "90%",
 #  out.height = 
-  cache = TRUE
+  cache = FALSE
 )
 
 #Set Theme for ggplot2
@@ -286,7 +286,7 @@ df.file.path <- osm_filepath_gen(data.folder = "original/osm",
                  key         = "leisure",
                  value       = "playground",
                  type = "point")
-#writes.csv(obj, file.path.df)
+#writes.csv(obj, df.file.path)
 
 #Save the eda ggplot like so (don't yet)
 gg.file.path <- osm_filepath_gen(data.folder = "original/osm/eda/figures", 

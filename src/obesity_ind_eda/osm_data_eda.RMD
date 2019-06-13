@@ -14,17 +14,17 @@ knitr::opts_knit$set(echo = TRUE,
 
 #To run the file you'll need to install all the packages here, in this order
 
-#Packages
 #install.packages("dplyr") # new  version
 #install.packages(c("snakecase", "janitor")) #tidy names
 #devtools::install_github("thomasp85/patchwork") #For multi-panel plots
 #install.packages("pillar") #Dependency for patchwork
 #install.packages(c("osmdata", "ggmap", "sp"))
 #install.packages(c("sp", "sf"))
+
+#Load the good stuff
 library(tidyverse)
 library(janitor)
 library(patchwork)
-library(ggridges) #Multi panel density plots
 library(osmdata)
 library(ggmap)
 library(purrr)
