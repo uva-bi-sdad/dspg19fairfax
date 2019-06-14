@@ -1,0 +1,99 @@
+---
+title: "osm-in-tracts"
+author: "Cong Cong"
+date: "6/13/2019"
+output: html_document
+---
+Description: This script experiments pulling American Community Survey (ACS) data and TIGER Shapefiles through Census Data API, aggregating and mapping OpenStreetMap data on Census Tracts.
+
+```{r}
+library(osmdata)
+library(rgdal)
+library(sf)
+library(sp)
+library(tidycensus)
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+library(tigris)
+```
+
+1. Download the Median Household Income etsimate for all census tracts using the tidycensus package. This example uses the ACS 5-Year Estimates for 2012-2016 (default).
+```{r}
+# Visit this site to request an API key ---> https://api.census.gov/data/key_signup.html
+# Only need to load your API key once...
+# census_api_key("YOURCENSUSAPIKEYHERE", overwrite=TRUE, install = TRUE)
+census_api_key("7a7317f23e9ade546eb19fc64649727eccc17b24",overwrite=TRUE,install = TRUE)
+readRenviron("~/.Renviron")
+```
+
+```{r}
+# Download Median Household Income data
+medincome<-get_acs(geography = "tract", county = "Fairfax County",
+                   variables = "B19013_001", 
+                   state='VA', geometry = TRUE)
+
+# Plot
+medincome %>%
+  ggplot(aes(fill = estimate)) + 
+  ggtitle(label = "Median Household Income by Census Tracts")+
+  geom_sf(color = NA) +
+  scale_fill_viridis_c(option = "magma") 
+
+```
+
+2. 
+```{r}
+# Get OSM healthcare data
+hospital<-opq('Fairfax County')%>%
+  add_osm_feature(key='amenity',value=c('hospital','baby_hatch','clinic','dentist','doctors',
+                                        'pharmacy','social_facility','veterinary'))%>%
+  osmdata_sp()
+
+# Specify the georeference we intend to use
+wgs84<-proj4string(hospital$osm_points)
+
+# Download the Census Tract shapefile for Fairfax County
+tracts.nad83<-tracts(state = '51', county = c('059'))
+# plot(tracts.nad83)
+# Change it to the osm projection
+tracts<-spTransform(tracts.nad83, wgs84)
+
+# Aggregate the healthcare facilities by Census Tracts
+osm_output<-data.frame()
+for (i in 1:dim(tracts)[1]) {
+  poly <- tracts$GEOID[i]
+  cell <- hospital$osm_points[tracts[i, ], ]
+  if(dim(cell)[1]>0){
+    tol_health<-dim(cell)[1]
+  }else{tol_health<-0.0}
+  record<-cbind.data.frame(poly, tol_health)
+  colnames(record)<-c("GEOID10","TotalHealth")
+  osm_output<-rbind(osm_output, record)
+}
+
+# Join the number of health care facilities back to the shapefile
+tracts_health<-merge(tracts, osm_output,  by.x="GEOID", by.y="GEOID10",all.x=TRUE)
+
+# Plot the number of healthcare facilities in a choropleth map
+breaks <- c(0,30,60,90,120)
+bin <- findInterval(tracts_health$TotalHealth, breaks, all.inside=TRUE)
+tracts_health_sf<-st_as_sf(tracts_health)
+
+
+ggplot(data = tracts_health_sf) +
+  geom_polygon(data = tracts_health, aes(x=long, y=lat, group=group),
+               fill="white", color="grey50", size=0.25) +
+  geom_sf(aes(fill=TotalHealth)) +
+  coord_sf(datum = NA) +
+  theme_map() +
+  theme(legend.position="bottom") 
+  ggtitle(label = "Number of Healthcare facilities by Census Tract", subtitle = "Fairfax County, VA") +
+  theme(plot.title = element_text(lineheight=.8, face="bold")) +
+  scale_fill_gradientn(colours = c("grey", "lightblue", "green", "yellow", "red"),
+                       limits=c(min(tracts_health_sf$TotalHealth), max(tracts_health_sf$TotalHealth)))
+
+
+```
+
+
