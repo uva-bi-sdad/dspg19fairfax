@@ -15,6 +15,8 @@ medincome<-get_acs(geography = "tract", county = "Fairfax County",
                    variables = "B19013_001", 
                    state='VA', geometry = TRUE)
 #head(medincome)
+#save(medincome,file="~/dspg19fairfax/data/original/medincome.RData")
+
 medincome %>%
   ggplot(aes(fill = estimate)) + 
   geom_sf(color = NA) + 
@@ -27,13 +29,13 @@ hospital<-opq('Fairfax County')%>%
                                         'pharmacy','social_facility','veterinary'))%>%
   osmdata_sp()
 
-# Specify the projection
+# Specify the projection 
 wgs84<-proj4string(hospital$osm_points)
 
 
 # Download Census tract shapefile 
 library(tigris)
-lookup_code("Virginia", "Fairfax County")
+#lookup_code("Virginia", "Fairfax County")
 tracts.nad83<-tracts(state = '51', county = c('059'))
 
 # Change it to the osm projection
@@ -43,8 +45,8 @@ tracts<-spTransform(tracts.nad83, wgs84)
 #plot(hospital$osm_points,add=TRUE,col="red",pch=19)
 
 osm_output<-data.frame()
-for (i in 1:2) {
-  poly <- tracts$GEOID10[i]
+for (i in 1:dim(tracts)[1]) {
+  poly <- tracts$GEOID[i]
   cell <- hospital$osm_points[tracts[i, ], ] 
   if(dim(cell)[1]>0){
     tol_health<-dim(cell)[1]
@@ -52,20 +54,12 @@ for (i in 1:2) {
 
 record<-cbind.data.frame(poly, tol_health)
 colnames(record)<-c("GEOID10","TotalHealth")
-osm_output<-rbind(osm.output, record)
+osm_output<-rbind(osm_output, record)
 } 
   
+# Join the number of health care facilities back to the shapefile
+tracts_health<-merge(tracts, osm_output,  by.x="GEOID", by.y="GEOID10",all.x=TRUE)
 
-the.cell <- osm.resid.pts[blocks[i, ], ] 
-if (dim(the.cell)[1] > 0) {
-acreage <- sum(the.cell@data$ACRES)
-totbldgs <- dim(the.cell)[1]
-}
-else {
-acreage <- 0.0
-totbldgs <- 0.0
-}
-this.one <- cbind.data.frame(the.poly, totbldgs, acreage)
-colnames(this.one) <- c("GEOID10", "TotalBldgs", "BldgAcres")
-osm.output <- rbind(osm.output, this.one)
-}
+colors <- heat.colors(dim(tracts))
+colors <- sort(colors, decreasing = TRUE)
+plot(tracts, col=colors)
