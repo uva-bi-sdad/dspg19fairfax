@@ -1,0 +1,155 @@
+---
+title: "OSM Obesity Data EDA"
+author: "Quinton Neville"
+date: "6/11/2019"
+output:
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#To run the file you'll need to install all the packages here, in this order
+
+#install.packages("dplyr") # new  version
+#install.packages(c("snakecase", "janitor")) #tidy names
+#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+#install.packages("pillar") #Dependency for patchwork
+#install.packages(c("osmdata", "ggmap", "sp"))
+#install.packages(c("sp", "sf"))
+
+#Load the good stuff
+library(tidyverse)
+library(janitor)
+library(patchwork)
+library(osmdata)
+library(ggmap)
+library(purrr)
+library(sp)
+library(sf)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = FALSE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#1. Explore OSM Data for Obesity Features
+
+####a. Playgrounds  
+
+Grab the data. Here, `get bb()` fetches the boundaries or box, `opq()` is the function which calls the  query through OSM's API, `add_osm_feature()` extracts the specific object(s) you are looking for and `osmdata_sf()` casts the object as a "simple feature object" (you can also use `osmdata_sp()` for quick plotting, see `CRAN`).   
+
+Then, we access the longitude and lattitude coordinates in the `geometry` column of the `osm_points` object (1 per observation), and bind them together by row, cast as a tibble, and give it appropriate column names.  
+
+```{r warning = FALSE}
+#Read in playground data
+play.df <- getbb("fairfax county", format_out = "polygon") %>%
+  opq() %>%
+  add_osm_feature(key = "leisure", value = "playground") %>%
+  osmdata_sf()
+
+#Pull latitude and longitude
+play.lat.long.df <- do.call(rbind, st_geometry(play.df$osm_points)) %>% 
+    as_tibble() %>% setNames(c("longitude", "latitude"))
+```
+
+Plot with `ggmap()` and `ggplot()`. First, get the boxed and ploygon area shapes of fairfax county. Use `get_map()` to pull the world map of your choice (there are tons of sources, and types to be standardized later). Then generate a `ggmap` of this object, draw the outline of fairfax county for reference to create the base Fairfax map object. Lastly, add on the features from the above `parks.df` to draw the desired points and density of parks in (an around) the county.  
+
+
+```{r warning = FALSE, message = FALSE}
+#Set Base Fairfax Map
+#Boundary and outline of Fairfax County
+fairfax.box <- getbb("fairfax county")
+fairfax.boundary <- getbb("fairfax county", format_out = "polygon") %>%
+  as.tibble() %>%
+  rename(longitude = `V1`, latitude = `V2`)
+
+#Grab the map info (many varieties)
+fairfax.map <- get_map(location = fairfax.box, source="stamen", maptype="watercolor", crop = TRUE)
+
+#ggmap and ggplot map and boundary
+ff.map <- ggmap(fairfax.map) +
+  geom_polygon(data = fairfax.boundary, aes(x = longitude, y = latitude), colour = "black", size = 1, alpha = 0.1) +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  )
+
+#Add locations of playgrounds
+playground.gg <- ff.map +
+  geom_point(data = play.lat.long.df, aes(x = longitude, y = latitude),
+             size = 0.1, colour = "red", alpha = 0.25) + 
+  geom_density_2d(data = play.lat.long.df, aes(x = longitude, y = latitude),
+                  colour = "purple", alpha = 0.5) +
+  labs(title = "Fairfax County Playgrounds")
+
+#Visualize
+playground.gg
+```
+
+
+
+
+####b. Parks  
+
+Repeat the process in a., except now we are interested in polygons or park areas. To do so we apply a slightly different approach but basically get the polygon outline (tibble of lat/long) for each park (1703) in a nested (a tibble of tibbles) frame, then `unnest()` it to obtain the ultimate long frame used for plotting each park area.  
+
+
+```{r park, warning = FALSE}
+#Read in playground data
+park.df <- getbb("fairfax county", format_out = "polygon") %>%
+  opq() %>%
+  add_osm_feature(key = "leisure", value = "park") %>%
+  osmdata_sf()
+
+#Obtain list of tibbles for each park's lat, long
+park.list <- do.call(rbind, st_geometry(park.df$osm_polygons)) %>%
+  lapply(as.tibble)
+
+#Grab length (number) of parks
+nparks <- length(park.list)
+
+#Comine w/factor park identifier and unnest (make long for plotting)
+park.lat.long.df <- tibble(
+  park     = 1:nparks %>% as.factor(),
+  coord.df = park.list
+) %>%
+  unnest(coord.df) %>%
+  rename(
+    longitude = lon,
+    latitude  = lat
+  )
+```
+
+Plot with `ggmap()`, same idea as a. above. 
+```{r park_plot, warning = FALSE}
+#Add polygons of parks
+park.gg <- ff.map +
+  geom_polygon(data = park.lat.long.df, aes(x = longitude, y = latitude, group = park), colour = "red", fill = "maroon", alpha = 0.5, size = 0.2) +
+  labs(title = "Fairfax County Park Areas")
+
+park.gg
+```
+
+####c. Patchwork to Panel display
+
+This package `patchwork` has really intuitive ways to panel `gg objects` or `globs`, look it up for further instructions but `+` puts things side by side, `/` one over the other, etc.  
+
+```{r patchwork, warning = FALSE}
+playground.gg + park.gg
+```
