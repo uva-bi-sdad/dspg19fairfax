@@ -1,0 +1,267 @@
+OSM EDA Template
+================
+Quinton Neville
+6/17/2019
+
+1. Define the Functions
+=======================
+
+Before you do anything, restart your R session (under Session at the top). Then run the setup chunk above to initilize the packages you need and other output definitions for the .RMD document (don't worry about these for now). Run this entire chunk to define the functions for use below. You can verify that this worked if they show up in your global envirnment (top right), under functions.
+
+``` r
+#Fairfax read OSM to output tibble (tidyr df)
+osm_to_df <- function(key = "leisure", value = "playground", type = "point") {
+#Read in playground data
+read.df <- getbb("fairfax county", format_out = "polygon") %>%
+  opq() %>%
+  add_osm_feature(key = key, value = value) %>%
+  osmdata_sf()
+    
+    if (type == "point" & !is.null(read.df$osm_points)) {
+      
+      lat.long.df <- do.call(rbind, st_geometry(read.df$osm_points)) %>% 
+        as_tibble() %>% 
+        setNames(c("longitude", "latitude")) %>%
+        mutate(object_id = 1:nrow(.) %>% as.factor()) %>%
+        dplyr::select(object_id, everything())
+      
+    } else if (type == "polygon" & !is.null(read.df$osm_polygons)) {
+      
+      poly.list <- do.call(rbind, st_geometry(read.df$osm_polygons)) %>%
+        lapply(as.tibble)
+      npolys    <- length(poly.list)
+      
+      lat.long.df <- tibble(
+        object_id = 1:npolys %>% as.factor(),
+        coord.df  = poly.list
+        ) %>%
+        unnest(coord.df) %>%
+        rename(
+        longitude = lon,
+        latitude  = lat
+        )
+      
+    } else if (type == "line" & !is.null(read.df$osm_lines)) {
+      
+      line.list <- do.call(list, st_geometry(read.df$osm_lines)) %>%
+        lapply(., rbind) %>%
+        lapply(., as.tibble)
+      nlines    <- length(line.list)
+      
+      lat.long.df <- tibble(
+        object_id = 1:nlines %>% as.factor(),
+        coord.df  = line.list
+        ) %>%
+        unnest(coord.df) %>%
+        rename(
+        longitude = lon,
+        latitude  = lat
+        )
+    } else {
+      ifelse(is.null(read.df$osm_points), stop("key/value incorrect or object type is empty"), 
+             ifelse(!(type %in% c("point", "polygon", "line")), stop("type is not point, polygon, or line"),
+                    stop("object type is empty, try another")))
+    }
+  
+  return(lat.long.df)
+}
+
+#Base Map Function
+fairfax.gg <- function() {
+fairfax.box <- getbb("fairfax county")
+fairfax.boundary <- getbb("fairfax county", format_out = "polygon") %>%
+  as.tibble() %>%
+  rename(longitude = `V1`, latitude = `V2`)
+
+#Grab the map info (many varieties)
+fairfax.map <- get_map(location = fairfax.box, source="stamen", maptype="watercolor", crop = TRUE)
+
+#ggmap and ggplot map and boundary
+ff.map <- ggmap(fairfax.map) +
+  geom_polygon(data = fairfax.boundary, aes(x = longitude, y = latitude), colour = "black", size = 1, alpha = 0.1) +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  )
+  return(ff.map)
+}
+
+#Point Visualization
+osm_point_plot <- function(ff.map, obj, value) {
+  if (!is.data.frame(obj)) stop("OSM object is not a data frame")
+  if (!is.ggplot(ff.map))  stop("Baseline Fairfax map is not a ggplot")
+  ff.map +
+  geom_point(data = obj, aes(x = longitude, y = latitude),
+             size = 0.1, colour = "red", alpha = 0.25) + 
+  geom_density_2d(data = obj, aes(x = longitude, y = latitude),
+                  colour = "purple", alpha = 0.5) +
+  labs(title = sprintf("Fairfax County %s", value))
+  }
+
+#Polygon Plot
+osm_poly_plot <- function(ff.map, obj, value) {
+  if (!is.data.frame(obj)) stop("OSM object is not a data frame")
+  if (!is.ggplot(ff.map))  stop("Baseline Fairfax map is not a ggplot")
+  ff.map +
+  geom_polygon(data = obj, aes(x = longitude, y = latitude, group = object_id), 
+               colour = "red", fill = "maroon", alpha = 0.5, size = 0.2) +
+  labs(title = sprintf("Fairfax County %s", value))
+  }
+
+#Line Plot
+osm_line_plot <- function(ff.map, obj, value) {
+  if (!is.data.frame(obj)) stop("OSM object is not a data frame")
+  if (!is.ggplot(ff.map))  stop("Baseline Fairfax map is not a ggplot")
+  ff.map +
+  geom_path(data = obj, aes(x = longitude, y = latitude, group = object_id), 
+               colour = "red", alpha = 0.5, size = 0.5) +
+  labs(title = sprintf("Fairfax County %s", value))
+  }
+
+#File Path Generator (for OSM specifically)
+osm_filepath_gen <- function(data.folder, file.type, key, value, type) {
+  date <- Sys.Date() %>% as.character() %>% str_replace_all("-", "_")
+  file.type <- "csv"
+  data.folder <- "original/osm"
+  file.path <- sprintf("./data/%s/%s_%s.%s", 
+                     data.folder,
+                     date, 
+                     paste(key, value, type, sep = "_"),
+                     file.type)
+  return(file.path)
+}
+```
+
+#### Markdown Reference
+
+Throughout the use of RMarkdown documents, this is a great reference/cheat sheet for all the general features of Markdown: <https://www.rstudio.com/wp-content/uploads/2016/03/rmarkdown-cheatsheet-2.0.pdf>
+
+I use it all the time when I can't remember how to do something.
+
+2. General OSM EDA Steps
+========================
+
+Using the playground/point map as an example:
+
+### i. Build the base Fairfax map
+
+``` r
+#Call
+ff.map <- fairfax.gg()
+
+#Plot to check that it worked properly
+ff.map
+```
+
+<img src="osm_eda_template_files/figure-markdown_github/base_ff_map-1.png" width="90%" />
+
+### ii. Call the function to return a tibble for the desired key, value, and different types (if applicable)
+
+``` r
+#Playground example
+play.df <- osm_to_df(key = "leisure", value = "playground", type = "point")
+play.df
+```
+
+    ## # A tibble: 9,587 x 3
+    ##    object_id longitude latitude
+    ##    <fct>         <dbl>    <dbl>
+    ##  1 1             -77.1     39.0
+    ##  2 2             -77.1     39.0
+    ##  3 3             -77.1     39.0
+    ##  4 4             -77.1     38.8
+    ##  5 5             -77.1     38.8
+    ##  6 6             -77.1     38.8
+    ##  7 7             -77.1     38.9
+    ##  8 8             -77.1     38.9
+    ##  9 9             -77.1     38.9
+    ## 10 10            -77.1     38.9
+    ## # … with 9,577 more rows
+
+Check out the `play.df` object in the global environment to make sure it worked correctly.
+
+iii. Call the function for the desired visualization (overlay the actual data onto the base map by specific type)
+=================================================================================================================
+
+``` r
+#Playground example (point plot specifically)  
+playground.gg <- osm_point_plot(ff.map, play.df, "Playgrounds")  
+playground.gg  
+```
+
+<img src="osm_eda_template_files/figure-markdown_github/unnamed-chunk-2-1.png" width="90%" />
+
+### iv. Evaluate each specific variable's:
+
+-   Number of Rows (observations)
+
+If the variable is a line or a polygon also use this to check the number of unique "objects" as well
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 9587
+
+-   Spatial Distribution (spread, concentration, etc.)
+
+Visual inspection with comments
+
+-   Trend or connections within the spatial distribution
+
+Visual inspection with comments
+
+-   Whether the variable's data appears to be usable (yes, no, maybe)
+
+If it is unclear whether it is good or bad data; do a little background research (Fairfax GIS map, Google, etc.) as to whether the OSM does a good job of representing reality. Actually, this is a good thing to do for all variables, briefly comment about the relationship between the proxy to anything you can find out about the reality of the objects when possible.
+
+*note - As proxy data, we know it will not be exactly accurate to reality, but rather we just wish to know if it is a good* ${\\bf representation}$ *of reality. That is really the key takeaway from each data exploration.*
+
+4. Writing the Data (if usable)
+===============================
+
+Note only uncomment the `write.csv()` function when you are actually prepared to write out the data, don't leave uncommented when knitting, or really every in case you accidently overwrite the data you actually want to store.
+
+``` r
+#Playground Example
+play.path <- osm_filepath_gen(data.folder = "original/osm", 
+                 file.type   = "csv",
+                 key         = "leisure",
+                 value       = "playground",
+                 type = "point")
+play.path
+```
+
+    ## [1] "./data/original/osm/2019_06_17_leisure_playground_point.csv"
+
+``` r
+##Don't run this until we've discussed naming format, data storage, reviewed the EDA together!!##
+#writes.csv(play.df, play.path)
+```
+
+5. Knitting
+===========
+
+Once you are satisfied with the content you have produced, we want to output this nice fancy document in a way that's easy for others to read.
+
+There are a variety of options for what type of document you want to knit (.pdf, .html, .github, etc.), for now let's knit everything to github documents. To do so:
+
+1.  Go to the top of the document window (below the tab with the name)
+
+2.  Click the drop down arrow for Knit (picture of a ball of yarn)
+
+3.  Select "knit to github document"
+
+4.  The outputted .md document (of the same name) should show up in the files tab (lower right)
+
+5.  In order for the figures to show up on git hub, you will also need to commit and push the folder *your\_rmd\_name*\_files; it stores the .png images used in the .md document.
+
+### a. Notes on knitting
+
+When you are knitting a document, it is exactly like restarting you R session and re-running the entire document. So you cannot call something later in the document if it has not already been defined somewhere above it. You always need to put the `library()` statements, and other settup instructions at the beggining of the document, otherwise it won't work. Think of knitting like running your code from an entirely clean slate, nothing in the global environment, no packages loaded, nothing. This is also a great way to ensure reporducibility, because quite literally, if even one piece is missing in the document's code, you defined something in the console or earlier that is not in the document, or a required package isn't loaded; it won't work.
+
+### b. Problems
+
+Spend some time trying to work through this stuff on your own. If you encounter a problem or don't totally understand something, check out the RMarkdown cheat sheet in the link above, google the problem (because there's 100% chance this problem has occured to someone else), and debug by trying things line by line to see where the actual error is. If after this, or it's been a while and you can't figure it out, come find Cong, myself, Teja, or basically any other project lead; and they should be able to help you out.
+
+Good luck!
