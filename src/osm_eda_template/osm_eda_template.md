@@ -4,7 +4,7 @@ Quinton Neville
 6/17/2019
 
 1. Define the Functions
-=======================
+-----------------------
 
 Before you do anything, restart your R session (under Session at the top). Then run the setup chunk above to initilize the packages you need and other output definitions for the .RMD document (don't worry about these for now). Run this entire chunk to define the functions for use below. You can verify that this worked if they show up in your global envirnment (top right), under functions.
 
@@ -139,7 +139,7 @@ Throughout the use of RMarkdown documents, this is a great reference/cheat sheet
 I use it all the time when I can't remember how to do something.
 
 2. General OSM EDA Steps
-========================
+------------------------
 
 Using the playground/point map as an example:
 
@@ -218,7 +218,7 @@ If it is unclear whether it is good or bad data; do a little background research
 *note - As proxy data, we know it will not be exactly accurate to reality, but rather we just wish to know if it is a good* ${\\bf representation}$ *of reality. That is really the key takeaway from each data exploration.*
 
 4. Writing the Data (if usable)
-===============================
+-------------------------------
 
 Note only uncomment the `write.csv()` function when you are actually prepared to write out the data, don't leave uncommented when knitting, or really every in case you accidently overwrite the data you actually want to store.
 
@@ -240,7 +240,7 @@ play.path
 ```
 
 5. Knitting
-===========
+-----------
 
 Once you are satisfied with the content you have produced, we want to output this nice fancy document in a way that's easy for others to read.
 
