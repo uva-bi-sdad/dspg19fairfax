@@ -173,5 +173,70 @@ osm_filepath_gen <- function(data.folder, file.type, key, value, type) {
                      file.type)
   return(file.path)
 }
+
+
+
+#Pl
+
+ff.map <- fairfax.gg()
+ff.map
+play.df <- osm_to_df(key = "leisure", value = "playground", type = "point")
+play.df
+playground.gg <- osm_point_plot(ff.map, play.df, "Playgrounds")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+#COMMENTS: No way to cross check playgrounds on GMAPS...
+
+
+#P2
+
+ff.map <- fairfax.gg()
+ff.map
+play.df <- osm_to_df(key = "leisure", value = "park", type = "polygon")
+play.df
+playground.gg <- osm_poly_plot(ff.map, play.df, "Parks")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+#COMMENT; useful but accuracy questionable
+#cross-check on fairfax. Perhaps it excludes the nature reserves? website:https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019
+
+#P3
+ff.map <- fairfax.gg()
+ff.map
+play.df <- osm_to_df(key = "leisure", value = "swimming_pool", type = "point")
+play.df
+playground.gg <- osm_point_plot(ff.map, play.df, "Swimming Pools")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+#COMMENT: Looks decent.
+#Compare to fairfax website: https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048
+
+#P4
+ff.map <- fairfax.gg()
+ff.map
+play.df <- osm_to_df(key = "leisure", value = "fitness_centre", type = "point")
+play.df
+playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Centers")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+
+
+
+#NOTE: we MIGHT want the next one ... your call.
+
+
+ff.map <- fairfax.gg()
+ff.map
+play.df <- osm_to_df(key = "leisure", value = "sports_centre", type = "point")
+play.df
+playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centres")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+
 ```
 
