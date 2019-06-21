@@ -1,0 +1,510 @@
+---
+title: "ACS EDA"
+author: "Quinton Neville"
+output:
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#To run the file you'll need to install all the packages here, in this order
+
+#install.packages("dplyr") # new  version
+#install.packages(c("snakecase", "janitor")) #tidy names
+#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+#install.packages("pillar") #Dependency for patchwork
+#install.packages(c("osmdata", "ggmap", "sp"))
+#install.packages(c("sp", "sf"))
+
+#Load the good stuff
+library(tidyverse)
+library(janitor)
+library(patchwork)
+library(osmdata)
+library(ggmap)
+library(purrr)
+library(sp)
+library(sf)
+library(tigris)
+library(viridis)
+library(corrplot)
+library(psych)
+library(factoextra)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = FALSE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#1. Data Description  
+
+```{r warning = FALSE, message = FALSE}
+#Read
+housing.df <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    housing_type = housing_type %>% as.factor(),
+    water        = water %>% as.factor(),
+    sewer        = sewer %>% as.factor(),
+    gas          = gas   %>% as.factor(),
+    district     = district  %>% as.factor(),
+    highschool   = highschool %>% as.factor()
+  )
+
+#Dimension
+house.dim  <- dim(housing.df)
+#Charstring of Variable Names
+house.vars <- str_c(names(housing.df), collapse = ", ")
+
+#Check uniqueness of parcel id's
+parcel.id.non.unique <- house.dim[1] - (housing.df$parcel_id %>% unique() %>% length())
+
+#Grab unique levels of each factor (cat variable)
+unique.char.types    <- housing.df %>%
+  select_if(is.factor) %>% 
+  map_dbl(.x = ., ~ unique(.x) %>% length()) 
+unique.parcels       <- housing.df$parcel_id %>% unique() %>% length()
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(housing.df),
+  Count = housing.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = housing.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean()) %>% round(5),
+) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+
+These housing data, probabilistically sampled to be a synthetically representative sample of households in Fairfax County, contain `r house.dim[1]` housing level observations in `r house.dim[2]` variables, given by: `r house.vars`. Parcel ID refers to the unique identifier of the parcel in which the housing unit exists, further there exist `r house.dim[1] - unique.parcels` repeated ID's (i.e. more than one housing unit in the same parcel). Number of units is a self explanatory continuous variable, where multiple units refers to an appartment complex. Housing type is a character vector with `r unique.char.types["housing_type"]` unique types while Year is an integer refering to the year the house was built. Longitude and latitude are continuous variables refering the geospatial location of the housing unit, while Water, Sewer, and Gas are character vectors with `r unique.char.types["water"]`, `r unique.char.types["gas"]`, and `r unique.char.types["sewer"]` unique observations, respectively. Value of the land, building, total, living area, and bedrooms/bathrooms are numeric values which describe value with respect to U.S. dollars. Lastly, GEOID describes the unique geo code used by the census as an observational identifier and there exist `r unique.char.types["district"]` districts with `r unique.char.types["highschool"]` highschools.  
+
+The rates and counts of missing data are given in the table below.
+
+```{r echo = FALSE}
+miss.df %>% knitr::kable()
+```
+
+#2. Variable Profiles and Visualizations  
+
+##i. Number of Units
+```{r}
+#Counts
+housing.df %>% 
+  mutate(
+    Type = ifelse(num_units > 1, "Multiple Unit", "Single Unit") %>%
+            as.factor()
+  ) %>%
+  group_by(Type) %>%
+  summarise(
+    Count    = n(),
+    Mean     = mean(num_units),
+    Median   = median(num_units),
+    Variance = sd(num_units)^2,
+    IQR      = quantile(num_units, c(0.25, 0.75)) %>% 
+               str_c(., collapse = ", ") %>%
+               str_c("(", ., ")")
+  ) %>% knitr::kable()
+
+#Distribution
+housing.df %>% 
+  mutate(
+    group = ifelse(num_units > 1, "Multiple Unit", "Single Unit") %>%
+            as.factor()
+  ) %>%
+  filter(group %in% "Multiple Unit") %>%
+  ggplot() +
+  geom_violin(aes(x = group, y = num_units, fill = group), trim = FALSE, alpha = 0.5) +
+  geom_boxplot(aes(x = group, y = num_units), colour = "black", width = .16, alpha = 0.8) +
+  labs(
+    x = "Type",
+    y = "Count",
+    title = "Distribution of Number of Units"
+  ) +
+  scale_fill_viridis_d() +
+  coord_flip() +
+  theme(legend.position = "none")
+```
+
+Here we stratified by those observations with at least one unit (House) versus those with more than one unit (Complex, Duplex, etc.) see that a majority of observations are houses, while a smaller number are appartment buildings. Of appartment buildings, the number of units is heavilly left skewed, without many outlying number of units at the upper end of the spectrum.  
+
+##ii. Housing Type
+
+```{r}
+#Table of Count/Frequency
+housing.df %>% 
+  group_by(housing_type) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `Housing Type` = housing_type
+  ) %>%
+  knitr::kable(digits = 3)
+```
+
+Here we see that a vast majority of observations are classified as Single Family Detached homes, followed by Townhomes, then Low - High rise units, with very few Duplexes and almost no Mobile Homes.  
+
+
+##iii. Year Built  
+
+```{r warning = FALSE, message = FALSE}
+#Distribution of Years
+all.time.gg <- housing.df %>% 
+  mutate(
+    group = rep("Domicile", length = nrow(.)) %>%
+      as.factor()
+  ) %>%
+  ggplot() +
+  geom_violin(aes(x = group, y = year_built, fill = group), trim = FALSE, alpha = 0.5) +
+  geom_boxplot(aes(x = group, y = year_built), colour = "black", width = .16, alpha = 0.8) +
+  labs(
+    x = "Count",
+    y = "Year",
+    title = "Distribution of Domiciles Built by Year"
+  ) +
+  scale_fill_viridis_d() +
+  coord_flip() +
+  theme(legend.position = "none")
+
+#Post WWII
+post.ww2.gg <- all.time.gg + ylim(c(1940, 2018))
+
+#Histogram
+post.ww2.hist <- housing.df %>% 
+  mutate(
+    group = rep("Domicile", length = nrow(.)) %>%
+      as.factor()
+  ) %>%
+  ggplot() +
+  geom_histogram(aes(x = year_built, fill = group), colour = "black", alpha = 0.5) +
+  labs(
+    x = "Year",
+    y = "Count",
+    title = "Distribution of Domiciles Built by Year"
+  ) +
+  scale_fill_viridis_d() +
+  theme(legend.position = "none") + 
+  xlim(c(1940, 2018))
+  
+#Display
+(all.time.gg / post.ww2.gg)
+post.ww2.hist
+```
+
+```{r warning = FALSE, message = FALSE, fig.height = 8}
+#Counts
+housing.df %>%
+  group_by(year_built) %>%
+  summarise(
+    Count = n()
+  ) %>%
+    arrange(desc(Count)) %>%
+  mutate(
+    Year = as.character(year_built) %>% 
+      as.factor() %>%
+      forcats::fct_reorder(., Count)
+    ) %>% 
+  slice(1:50) %>%
+    ggplot(aes(x = Year, y = Count, fill = Count)) +
+  geom_bar(stat = "identity", width = 1, colour = "black") +
+  coord_flip() +
+  labs(
+    x = "Year",
+    y = "Number of Domiciles Built",
+    title = "Number of Domiciles Built by Year"
+  ) +
+theme(legend.position = "right",
+  axis.text.y = element_text(color = "black", 
+  size = 10,  hjust = 1)) +
+  scale_fill_viridis_c("Number of Domociles \nBuilt")
+
+```
+
+Here we observed that there are quite a few domiciles were built well before World War II, though few in each year still remain, while the majority of houses were built after World War II to present. Additionally, there exist `r sum(is.na(housing.df$year_built))` observations where the year of building was unknown. Clearly, this distribution is heavily left skewed, but taking a snapshot of houses built after WWII, this bimodal distribution appears to be *approximately* empirically normal.  
+
+
+##iv. Water, Sewer, Gas  
+
+```{r}
+#Table of Count/Frequency Water
+housing.df %>% 
+    mutate(
+    water = water %>% as.character() %>% replace_na(., "Not Available")
+  ) %>% 
+  group_by(water) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `Water Availability` = water
+  ) %>%
+  knitr::kable(digits = 3)
+
+#Table of Count/Frequency Sewage
+housing.df %>% 
+  mutate(
+    sewer = sewer %>% as.character() %>% replace_na(., "Not Available")
+  ) %>%
+  group_by(sewer) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `Sewage Availability` = sewer
+  ) %>%
+  knitr::kable(digits = 3)
+
+#Table of Count/Frequency Gas
+housing.df %>% 
+  mutate(
+    gas = gas %>% as.character() %>% replace_na(., "Not Available")
+  ) %>%
+  group_by(gas) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `Gas Availability` = gas
+  ) %>%
+  knitr::kable(digits = 3)
+```
+
+These data suggest that apporximately 95% of domiciles had water services connected, with 3% of services being unnavailable. With respect to sewage, 92% were connected and 6% of services were unnavailable. Lastly, roughly 65% of domiciles had gas connected, 30% did not have services available, and 4% had services available but not connected. Overall, slightly less than 1% of these data were missing/unnavailable for water and sewage, while over 1% was missing for gas services.  
+
+##v. District and Highschool  
+
+```{r}
+#Table of Count/Frequency District
+housing.df %>% 
+    mutate(
+    district = district %>% 
+      as.character() %>% 
+      replace_na(., "Not Available")
+  ) %>% 
+  group_by(district) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `School District` = district
+  ) %>%
+  knitr::kable(digits = 3)
+
+#Table of Count/Frequency HIghschool
+housing.df %>% 
+  mutate(
+    highschool = highschool %>% 
+      as.character() %>% 
+      replace_na(., "Not Available")
+  ) %>%
+  group_by(highschool) %>% 
+  summarise(
+    Count =n()
+    ) %>% 
+  mutate(
+    Frequency = str_c(round(Count / sum(Count)*100,2),"%")
+    ) %>%
+  rename(
+    `Highschool` = highschool
+  ) %>%
+  knitr::kable(digits = 3)
+```
+
+
+Overall, we observed that observations were roughly uniformly distributed by School District, with Hunter Mill having slightly more than average and Lee having slightly fewer. We observed a similar trend amongst highschools, with a roughly uniform distribution of observations with South County and Annadale having slightly fewer than average while South Lakes had a percentage point more observations than average.  
+
+##vi. Land, Building, and Total Value
+
+```{r warning = FALSE, message = FALSE, fig.width = 6}
+#Table of Value stratified by Single/Multiple Unit & Type
+housing.df %>% 
+  mutate(
+    `Housing Type` = ifelse(num_units > 1, "Multiple Unit", "Single Unit") %>%
+            as.factor()
+  ) %>%
+  dplyr::select(`Housing Type`, value_land, value_building, value_total) %>%
+  rename(
+    Land     = value_land,
+    Building = value_building,
+    Total    = value_total
+  ) %>%
+  gather(key = `Type`, value = `Value`, Land:Total) %>%
+  group_by(`Housing Type`, Type) %>%
+  summarise(
+    mean     = mean(Value, na.rm = TRUE),
+    median   = median(Value, na.rm = TRUE),
+    variance = sd(Value, na.rm = TRUE)^2,
+    IQR      = quantile(Value, c(0.25, 0.75), na.rm = TRUE) %>% 
+               str_c(., collapse = ", ") %>%
+               str_c("(", ., ")")
+  ) %>% knitr::kable()
+
+#Distribution of Value by Single/Multiple Unit & Type
+housing.df %>%
+  mutate(
+    `Housing Type` = ifelse(num_units > 1, "Multiple Unit", "Single Unit") %>%
+            as.factor() %>% fct_relevel("Single Unit")
+  ) %>%
+  dplyr::select(`Housing Type`, value_land, value_building, value_total) %>%
+  rename(
+    Land     = value_land,
+    Building = value_building,
+    Total    = value_total
+  ) %>%
+  gather(key = `Type`, value = `Value`, Land:Total) %>%
+  ggplot() +
+  geom_density(aes(x = Value/1000000, fill = Type), alpha = 0.5, adjust = 4, colour = "black") +
+  labs(
+    x = "Value in Millions of Dollars",
+    y = "Density",
+    title = "Distribution of Value by Type"
+  ) +
+  scale_fill_viridis_d() +
+  xlim(c(0, 3)) +
+  facet_wrap(~`Housing Type`) +
+  theme(axis.text.x = element_text(color = "black", 
+        size = 10, vjust = .5))
+```
+
+First we note that we must necessarily deal with the extreme outliers for both multiple and single unit domiciles; as clearly the insanely inflated variance and skew is going to make the use of the variable problematic. However, restricting our scope to just observations valued between 0-3 Million dollars, we notice that the distribution of value for single units is less variable, but the Land's central tendency is valued lower than Building; which I would say is the reverse trend for multiple unit observations. Additionally, as is both intuitive and explicit by the high variability in all multiple unit values, there are much more extreme/frequent outliers at the high end of the spectrum there than for single units. 
+
+
+
+##vii. Correlations
+
+###a. Continuous Variables
+
+```{r}
+housing.df %>%
+  dplyr::select_if(is.numeric) %>%
+  na.omit() %>%
+  cor(method = "spearman") %>%
+  corrplot(type = "upper", order = "hclust", tl.col = "black", tl.cex = 0.75)
+```
+
+###b. Categorical Variables
+```{r eval = FALSE}
+housing.df %>%
+  dplyr::select_if(is.factor) %>%
+  na.omit() %>%
+tetrachoric()
+corrplot(type = "upper", order = "hclust", tl.col = "black", tl.cex = 0.75)
+```
+
+What correlation calculation should we use for these categorical variables? Is it even possible?  
+
+#viii. Dimensionality  
+
+```{r}
+#Scree Plot (percentage of variability explained by each principal component)
+housing.df %>%
+  dplyr::select_if(is.numeric) %>%
+  select(-geoid) %>%
+  na.omit() %>%
+  as.matrix() %>%
+  princomp() %>%
+  fviz_eig()
+
+#Visualize Features (projected onto first two principal component dimensions)
+housing.df %>%
+  dplyr::select_if(is.numeric) %>%
+  dplyr::select(-geoid) %>%
+  na.omit() %>%
+  princomp() %>%
+  fviz_pca_var(.,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+
+```
+
+
+Analyzing the basic dimensionality of the continuous variables evident in these synthetic ACS data, we noted that there is overwhelming evidence to suggest that one dimension is sufficient to capture almost 92% of the variability (within the continuous data). This will be important to remember later for indicator construction.  
+
+#viii. Initial Geo Spatial Visualization  
+
+```{r warning = FALSE, message = FALSE, echo = FALSE}
+#Base Map Function
+fairfax.gg <- function() {
+fairfax.box <- getbb("fairfax county")
+fairfax.boundary <- getbb("fairfax county", format_out = "polygon") %>%
+  as.tibble() %>%
+  rename(longitude = `V1`, latitude = `V2`)
+
+#Grab the map info (many varieties)
+fairfax.map <- get_map(location = fairfax.box, source="stamen", maptype="watercolor", crop = TRUE)
+
+#ggmap and ggplot map and boundary
+ff.map <- ggmap(fairfax.map) +
+  geom_polygon(data = fairfax.boundary, aes(x = longitude, y = latitude), colour = "black", size = 1, alpha = 0.1) +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  )
+  return(ff.map)
+}
+```
+
+###Fairfax Boundary/Census Track by Domicile Location  
+
+```{r warning = FALSE, message = FALSE, results = "hide"}
+#Read Shape File
+tracts.nad83<-tracts(state = '51', county = c('059'))
+```
+
+```{r warning = FALSE, message = FALSE}
+#Build Map of FF Census Tract
+census.tract <- fairfax.gg() + 
+  geom_polygon(data = tracts.nad83, 
+               aes(x = long, y = lat, group = group), colour = "black", alpha = 0, size = 0.5) +
+  theme(legend.position = "none") +
+  labs(
+    title = "Fairfax Census Tracts"
+  )
+
+#Domiciles by Census Tract
+house.by.census.tract <- fairfax.gg() + 
+  geom_polygon(data = tracts.nad83, 
+               aes(x = long, y = lat, group = group), colour = "black", alpha = 0, size = 0.8) +
+  geom_point(data = housing.df,
+             aes(x = longitude, y = latitude), colour = "red", size = 0.00001, alpha = 0.1) + 
+  theme(legend.position = "none") +
+  labs(
+    title = "Location of ACS Domiciles by Fairfax Census Tract"
+  )
+  
+census.tract
+house.by.census.tract
+```
