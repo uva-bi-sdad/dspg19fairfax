@@ -550,17 +550,33 @@ tracts.nad83<-tracts(state = '51', county = c('059'))
 ```
 
 ``` r
-#Build Map
-fairfax.gg() + 
+#Build Map of FF Census Tract
+census.tract <- fairfax.gg() + 
   geom_polygon(data = tracts.nad83, 
-               aes(x = long, y = lat, group = group, fill = group), alpha = 0.64) +
-  geom_point(data = housing.df,
-             aes(x = longitude, y = latitude), colour = "red", size = 0.00001, alpha = 0.1) +
-  scale_fill_viridis_d() +
+               aes(x = long, y = lat, group = group), colour = "black", alpha = 0, size = 0.5) +
   theme(legend.position = "none") +
   labs(
-    title = "Location of ACS Domiciles by Fairfax Census Track"
+    title = "Fairfax Census Tracts"
   )
+
+#Domiciles by Census Tract
+house.by.census.tract <- fairfax.gg() + 
+  geom_polygon(data = tracts.nad83, 
+               aes(x = long, y = lat, group = group), colour = "black", alpha = 0, size = 0.8) +
+  geom_point(data = housing.df,
+             aes(x = longitude, y = latitude), colour = "red", size = 0.00001, alpha = 0.1) + 
+  theme(legend.position = "none") +
+  labs(
+    title = "Location of ACS Domiciles by Fairfax Census Tract"
+  )
+  
+census.tract
 ```
 
 <img src="acs_eda_files/figure-markdown_github/unnamed-chunk-15-1.png" width="90%" />
+
+``` r
+house.by.census.tract
+```
+
+<img src="acs_eda_files/figure-markdown_github/unnamed-chunk-15-2.png" width="90%" />
