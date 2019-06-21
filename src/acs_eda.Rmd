@@ -1,0 +1,53 @@
+---
+title: "acs_eda"
+author: "Cong Cong"
+date: "6/13/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,warning=FALSE}
+library(dplyr)
+library(tigris)
+```
+
+This script explores the variables in Fairfax housing stock data for potential indicators.
+
+```{r}
+# Read in the file
+housing<-read.csv("~/dspg19fairfax/data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv")
+colnames(housing)
+```
+
+
+### Housing types
+Number and percentage of unique housing types:
+```{r}
+housing%>%group_by(HOUSING_TYPE)%>%summarise(count=n())%>%mutate(freq =paste0(round(count / sum(count)*100,2),"%"))
+```
+
+### Land, Building, and Total Value
+```{r}
+value<-housing%>%select(VALUE_LAND,VALUE_BUILDING,VALUE_TOTAL)
+# Descriptive statistics
+summary(value)
+boxplot(value)
+```
+`r nrow(value[!complete.cases(value),])` number of rows have missing values.
+
+### Correlation matrix
+```{r}
+housing_num <- select_if(housing, is.numeric)
+housing_num<-housing_num[,-c(3,4,11)]
+cor(housing_num,use = "complete.obs")
+```
+
+### Basic mapping
+```{r}
+tracts.nad83<-tracts(state = '51', county = c('059'))
+plot(tracts.nad83)
+points(housing$LONGITUDE, housing$LATITUDE, col = "red", cex = .05)
+```
