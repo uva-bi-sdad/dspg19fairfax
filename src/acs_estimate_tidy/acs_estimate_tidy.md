@@ -1,44 +1,12 @@
----
-title: "ACS Estimate Read and Tidy"
-author: "Quinton Neville"
-date: "6/24/2019"
-output:
-  github_document: default
-  html_document: default
----
+ACS Estimate Read and Tidy
+================
+Quinton Neville
+6/24/2019
 
-```{r setup, include=FALSE, message = FALSE, warning = FALSE}
-#Installation Libraries if needed
+1. Read ACS Estimate Data (by geography)
+========================================
 
-#Libraries
-library(tidyverse)
-library(janitor) #Also needs library(snakecase) as dependencies
-library(viridis)
-library(purrr)
-
-#Setting root directory
-knitr::opts_knit$set(echo = TRUE,
-                     root.dir = rprojroot::find_rstudio_root_file())
-
-#Controlling figure output in markdown
-knitr::opts_chunk$set(
-#  fig.height =   
-  fig.width = 6,
-#  fig.asp = .5,
-  out.width = "90%",
-#  out.height = 
-  cache = FALSE
-)
-#Set Theme for ggplot2
-theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
-#Set Scientific notation output for knitr
-options(scipen = 999999)
-```
-
-
-#1. Read ACS Estimate Data (by geography)
-
-```{r message = FALSE}
+``` r
 read_acs <- function(geo_type = "blockgroup") {
 
 #Generate path based on geography type
@@ -99,8 +67,10 @@ missing <- ifelse(any(missing != 0), "Missing Data Present", "No Missing Data")
 ##test$missing
 ```
 
-#2. Write out CSV's into New Clean Files
-```{r message = FALSE, eval = FALSE}
+2. Write out CSV's into same files
+==================================
+
+``` r
 blockgroup.list  <- read_acs("blockgroup")
 district.list    <- read_acs("district")
 highschool.list  <- read_acs("highschool")
@@ -131,11 +101,5 @@ write_acs(blockgroup.list$data, file.path)
 write.csv(blockgroup.list$data, file.path)
 ```
 
-
-#3. Example Read, Tidy, Explore New Cleaned Data
-
-```{r}
-
-
-```
-
+3. Example Read and Tidy New Cleaned Data
+=========================================
