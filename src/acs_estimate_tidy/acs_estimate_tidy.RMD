@@ -1,0 +1,42 @@
+---
+title: "ACS Estimate Read and Tidy"
+author: "Quinton Neville"
+date: "6/24/2019"
+output:
+  html_document: default
+  github_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Installation (if needed)
+#install rjson
+#install.packages("rjson")
+#install snakecase (janitor dependency)
+#install.packages("snakecase")
+#install janitor
+#install.packages("janitor") #help tidying
+#install.packages("viridis") #colourblind pallete
+
+#Libraries
+library(tidyverse)
+library(janitor)
+library(viridis)
+
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = TRUE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
