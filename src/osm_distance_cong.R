@@ -5,8 +5,8 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(dplyr, purrr, sf, mapview, traveltime)
 
 ## Test basic plotting
-traveltime30 <- traveltime_map(appId="3c54476f",
-                               apiKey="3902eeb364e6db623d0b4f11fc25379c",
+traveltime30 <- traveltime_map(appId="appid",
+                               apiKey="appkey",
                                location=c(38.842669, -77.270272),
                                traveltime=1800,
                                type="public_transport",
@@ -14,7 +14,7 @@ traveltime30 <- traveltime_map(appId="3c54476f",
 mapview(traveltime_smt,  col.regions = c("grey")) + traveltime_smt
 
 
-#===========THIS IS THE PART FOR FETCHING SUPERMARKETS TRAVEL POLYGONS==============
+#===========THIS IS THE PART FOR FETCHING SUPERMARKETS TRAVEL ISOCHRONES==============
 
 ## OSM Supermarket
 library(osmdata)
@@ -27,8 +27,8 @@ df<-as.data.frame(st_coordinates(supermarket$osm_points))
 traveltime_smt<-data.frame()
 
 for (i in 1:nrow(df)){
-  this.one <- traveltime_map(appId="3c54476f",
-                                 apiKey="3902eeb364e6db623d0b4f11fc25379c",
+  this.one <- traveltime_map(appId="appid",
+                                 apiKey="appkey",
                                  location=c(df$Y[i], df$X[i]),
                                  traveltime=1200,
                                  type="public_transport",
