@@ -13,23 +13,15 @@ output:
 knitr::opts_knit$set(echo = TRUE,
                      root.dir = rprojroot::find_rstudio_root_file())
 
-#To run the file you'll need to install all the packages here, in this order
+#Load Pacman for multiple package loads
+if (!require("pacman")) install.packages(pacman)
 
-#Packages
-#install.packages("dplyr") # new  version
-#install.packages(c("snakecase", "janitor")) #tidy names
-#install.packages("pillar") #Dependency for patchwork
-#devtools::install_github("thomasp85/patchwork") #For multi-panel plots
-#install.packages(c("osmdata", "ggmap"))
-#install.packages(c("sp", "sf"))
-library(tidyverse) 
-library(janitor)   #Clean names
-library(patchwork) #Multi panel plots
-library(osmdata)   #OSM
-library(ggmap)     #Tidy gg maps
-library(purrr)     #Map functions
-library(sp)        #Spatial forms
-library(sf)        #Spatial forms
+#Need most updated dplyr if haven't already done this
+#install.packages("dplyr") #need updated dplyr for sf objects
+
+#Load all the good stuff
+pacman::p_load(tidyverse, purrr, sf, mapview, ggmap,
+               patchwork, osmdata, mapview, traveltime)
 
 #Controlling figure output in markdown
 knitr::opts_chunk$set(
@@ -47,6 +39,7 @@ theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.posi
 #Set Scientific notation output for knitr
 options(scipen = 999999)
 ```
+
 
 ```{r echo = FALSE}
 #Define functions for OSM Use  
@@ -174,7 +167,7 @@ osm_filepath_gen <- function(data.folder, file.type, key, value, type) {
 ```  
 
 ##Read Data and Generate OSM Data
-```{r}
+```{r message = FALSE, warning = FALSE, results = FALSE, error = FALSE}
 #Read
 housing.df <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
   janitor::clean_names() %>%
@@ -188,7 +181,14 @@ housing.df <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018
   )
 
 #Generate OSM Point data (playground example)
+playground.df <- osm_to_df()
+```
 
 
+##Load and Extract Relevant Geo Data from OSMR()
+
+```{r message = FALSE, error = FALSE, warning = FALSE, include = FALSE}
 
 ```
+
+
