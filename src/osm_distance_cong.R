@@ -5,8 +5,8 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(dplyr, purrr, sf, mapview, traveltime)
 
 ## Basic plotting
-traveltime30 <- traveltime_map(appId="3c54476f",
-                               apiKey="3902eeb364e6db623d0b4f11fc25379c",
+traveltime30 <- traveltime_map(appId="appid",
+                               apiKey="appkey",
                                location=c(38.842669,-77.270272),
                                traveltime=1800,
                                type="public_transport",
@@ -23,8 +23,8 @@ supermarket<-opq('Fairfax County')%>%
 
 df<-as.data.frame(st_coordinates(supermarket$osm_points))
 
-df%>%mutate(sf=map2(.x=X,.y=Y,~traveltime_map(appId="3c54476f",
-                                              apiKey="3902eeb364e6db623d0b4f11fc25379c",
+df%>%mutate(sf=map2(.x=X,.y=Y,~traveltime_map(appId="appid",
+                                              apiKey="appkey",
                                               location=c(.y,.x),
                                               traveltime=1200,
                                               type="public_transport",
