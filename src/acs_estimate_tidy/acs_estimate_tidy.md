@@ -1,0 +1,200 @@
+ACS Estimate Read and Tidy
+================
+Quinton Neville
+6/24/2019
+
+1. Read ACS Estimate Data (by geography)
+========================================
+
+Below we write a fuction to read and bind all of the ACS .csv files together inside of a given folder (i.e. by a specific geographical region; blockgroup, track, etc.)
+
+``` r
+#Define geography types (name of folder in ACS_etimates)
+geo.types <- c("blockgroup", "district", "highschool", "opportunity")
+
+#Function to read in each folder of .csv data (by variable est.)
+read_acs <- function(geo.type = "blockgroup") {
+  
+#Check correct geo_type
+  if (!(geo.type %in% geo.types)) {stop(sprintf("geo.type not one of: %s", str_c(geo.types, collapse = ", ")))}
+
+#Generate path based on geography type
+relative.path <- str_c("./data/working/ACS_estimates/", geo.type)
+  
+#List files, cast as tibble, map -> nest each data.csv, track data source
+acs.file.df <- list.files(path = relative.path) %>%
+  enframe() %>%
+  rename(data_path = value) %>%
+  mutate(
+    data_path     = str_c(relative.path, "/", data_path),
+    input_files   = map(.x = data_path, ~read_csv(.x)),
+    data_source   = str_split(data_path, "/") %>% 
+                    map_chr(6) %>%
+                    str_remove(".csv")
+  ) %>%
+  dplyr::select(-data_path)
+
+#Iteratively join each df by GEOID
+acs.df     <- acs.file.df$input_files[[1]]  #Pull first data frame
+
+#Join by specific ID (given geo_type)
+
+join.by <- ifelse(geo.type %in% "blockgroup", "GEOID",
+                  ifelse(geo.type %in% "district", "DISTRICT",
+                         ifelse(geo.type %in% "highschool", "HIGHSCHOOL",
+                                "TRACT")))
+
+#Loop
+for(i in 2:nrow(acs.file.df)) {
+  acs.df <- left_join(acs.df, acs.file.df$input_files[[i]], by = join.by) 
+}
+
+#Clean names
+acs.df <- acs.df %>%
+  janitor::clean_names()
+
+#Not Ideal but ID is always first column, cast factor
+#acs.df[ ,1] <- as.factor(acs.df[ ,1])
+
+
+#Profile Dim, missing ACS 
+dim.acs <- dim(acs.df)
+missing <- map_dbl(.x = acs.df, ~is.na(.x) %>% mean())
+missing <- ifelse(any(missing != 0), "Missing Data Present", "No Missing Data")
+
+#Return List of data, tidy data, dimension, and whether or not there is missing data
+##Missing is a check to make sure the read operated correctly (as there is none)
+
+  return(list(data = acs.df, dimension = dim.acs, missing = missing))
+}
+
+#Test and view output
+##test <- read_acs()
+##head(test$data)
+##head(test$tidy_data)
+##test$dimension  
+##test$missing
+```
+
+2. Write out CSV's into New Clean Files
+=======================================
+
+Next, we test the function on each geographical type, see that it is working properly, then join all 4 ACS geographical boundary dataframes into one complete data frame with an `id` (geoid, etc.) and `id_type` identifier (one of blockgroup, census\_track, etc.). Further, we create a second tidy (long) data frame. Next we write a function to standardize the filepath and write out the resulting .csv files for later use in the `./data/woring/ACS_joined_estimates` folder with the date and description of data in the filename.
+
+``` r
+#Check that each read function works for each geography type
+blockgroup.list  <- read_acs("blockgroup")
+district.list    <- read_acs("district")
+highschool.list  <- read_acs("highschool")
+opportunity.list <- read_acs("opportunity")
+
+#Iterate and row_bind data together with Indicator for id and type of id (i.e. blockgroup, highschool, etc.)
+joined.df <- map_df(.x = geo.types, ~read_acs(.x)$data) %>%
+                   mutate(
+                     id_type = rep(geo.types, c(nrow(blockgroup.list$data),
+                                           nrow(district.list$data), 
+                                           nrow(highschool.list$data), 
+                                           nrow(opportunity.list$data))) %>%
+                                           as.factor() %>%
+                        fct_recode(supervisor_district = "district",
+                                   highschool_district = "highschool",
+                                   census_tract = "opportunity"),
+                     id = c(geoid, district, highschool, tract) %>%
+                       na.omit()
+                   ) %>%
+                   dplyr::select(id, id_type, everything(), -c(geoid, district, tract, highschool))
+
+joined.tidy.df <- joined.df %>% 
+  gather(key = variable, value = value, -c(id, id_type))
+
+#Function to write data with good filepath
+write_acs <- function(data, geo.type = "blockgroup") {
+  #Generate filepath
+  file.path <- str_c(
+    "./data/working/ACS_joined_estimates/",
+    Sys.Date() %>%
+      str_replace_all("-", "_"),
+      str_c("_acs_", geo.type, ".csv")
+  )
+  #Write data with filepath
+  write_csv(data, path = file.path)
+}
+
+#Write the regular and tidy (long) dataframes as csv's -- Only uncomment if you want to overwrite existing data
+#write_acs(joined.df, "all_geography")
+#write_acs(joined.tidy.df, "all_geography_tidy")
+```
+
+3. Example Read and Explore data
+================================
+
+Here we provide a quick example for reading the data and performing an aspect of exloratory analysis. The tidy frame will be most helpful for the EDA, but having the original data may useful as well.
+
+``` r
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+To find the number of unique id's in a given geographic grouping of ACS data and the number of unique observations (w/ respect to all variables/features) -
+
+``` r
+#Unique ID's by type - Use the original data
+acs.df %>% 
+  group_by(id_type) %>%
+  summarize(
+    n_unique_ids = n()
+  ) %>% knitr::kable() #pretty table
+```
+
+| id\_type             |  n\_unique\_ids|
+|:---------------------|---------------:|
+| blockgroup           |             649|
+| census\_tract        |               9|
+| highschool\_district |              24|
+| supervisor\_district |               9|
+
+``` r
+#Unique observations by ID by type - Use the tidy data  
+acs.tidy.df %>%
+  group_by(id_type) %>%
+  summarize(
+    n_unique_observations = n()
+  ) %>% knitr::kable() #pretty table
+```
+
+| id\_type             |  n\_unique\_observations|
+|:---------------------|------------------------:|
+| blockgroup           |                    96052|
+| census\_tract        |                     1332|
+| highschool\_district |                     3552|
+| supervisor\_district |                     1332|
+
+To plot the relationship between the first variable `age0_5_est` by its margin of error, by geographic type; we may produce the scatterplot --
+
+``` r
+acs.df %>%
+  mutate(
+    id_type = fct_recode(id_type, 
+                         Blockgroup = "blockgroup",
+                         `Census Tract` = "census_tract",
+                         `Highschool District` = "highschool_district",
+                         `Supervisor District` = "supervisor_district"
+                         ) 
+  ) %>%
+  dplyr::select(c(id_type, age0_5_est, age0_5_moe)) %>%
+  ggplot(aes(x = age0_5_est, y = age0_5_moe, colour = id_type)) +
+  geom_jitter(alpha = 0.32, size = 1, position = "jitter") +
+  geom_smooth(method = "lm", se = FALSE, alpha = 0.8) +
+  labs(
+    x = "Estimated Number of Persons Aged 0-5",
+    y = "Margin of Error",
+    title = "Estimated Persons Aged 0-5 & M.O.E. by Geographic Boundary"
+  ) +
+  scale_colour_viridis_d("Geographic Type") + 
+  guides(col = guide_legend(ncol = 2))
+```
+
+<img src="acs_estimate_tidy_files/figure-markdown_github/unnamed-chunk-5-1.png" width="90%" />
+
+Add we see that stratifying by geographic boundary, the margin of error increases steadily as the number of persons increases; with the most profound effect being at the smaller geographic groupings vs. the larger (i.e. the slope of the linear trend reduces as the number of people increases and geographic type changes from small to large).
