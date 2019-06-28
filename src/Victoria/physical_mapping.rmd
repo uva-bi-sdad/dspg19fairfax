@@ -47,7 +47,7 @@ theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.posi
 options(scipen = 999999)
 ```
 
-##1. Define the Functions  
+1. Define the Functions  
 
 Before you do anything, restart your R session (under Session at the top). Then run the setup chunk above to initilize the packages you need and other output definitions for the .RMD document (don't worry about these for now). Run this entire chunk to define the functions for use below. You can verify that this worked if they show up in your global envirnment (top right), under functions.  
 
@@ -173,10 +173,10 @@ osm_filepath_gen <- function(data.folder, file.type, key, value, type) {
                      file.type)
   return(file.path)
 }
+```
 
 
-
-#Pl
+```{r}
 
 ff.map <- fairfax.gg()
 ff.map
@@ -186,11 +186,11 @@ playground.gg <- osm_point_plot(ff.map, play.df, "Playgrounds")
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
-#COMMENTS: No way to cross check playgrounds on GMAPS...
+```
 
+COMMENTS: No way to cross check playgrounds on GMAPS...
 
-#P2
-
+```{r}
 ff.map <- fairfax.gg()
 ff.map
 play.df <- osm_to_df(key = "leisure", value = "park", type = "polygon")
@@ -199,10 +199,12 @@ playground.gg <- osm_poly_plot(ff.map, play.df, "Parks")
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
-#COMMENT; useful but accuracy questionable
-#cross-check on fairfax. Perhaps it excludes the nature reserves? website:https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019
+```
 
-#P3
+COMMENT; useful but accuracy questionable
+cross-check on fairfax. Perhaps it excludes the nature reserves? website:https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019
+
+```{r}
 ff.map <- fairfax.gg()
 ff.map
 play.df <- osm_to_df(key = "leisure", value = "swimming_pool", type = "point")
@@ -211,10 +213,12 @@ playground.gg <- osm_point_plot(ff.map, play.df, "Swimming Pools")
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
-#COMMENT: Looks decent.
-#Compare to fairfax website: https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048
+```
 
-#P4
+COMMENT: Looks decent.
+Compare to fairfax website: https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048
+
+```{r}
 ff.map <- fairfax.gg()
 ff.map
 play.df <- osm_to_df(key = "leisure", value = "fitness_centre", type = "point")
@@ -222,13 +226,13 @@ play.df
 playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Centers")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
+```
 
 
+NOTE: we MIGHT want the next one ... your call.
 
 
-#NOTE: we MIGHT want the next one ... your call.
-
-
+```{r}
 ff.map <- fairfax.gg()
 ff.map
 play.df <- osm_to_df(key = "leisure", value = "sports_centre", type = "point")
@@ -236,7 +240,6 @@ play.df
 playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centres")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
-
 
 ```
 
