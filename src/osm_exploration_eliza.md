@@ -1,0 +1,409 @@
+OSM Variable Exploration
+================
+Eliza
+6/18/2019
+
+LOAD PACKAGES AND LIBRARIES
+===========================
+
+``` r
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+install.packages("dplyr") # new  version
+install.packages(c("snakecase", "janitor")) #tidy names
+install.packages("pillar") #Dependency for patchwork
+devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+install.packages(c("osmdata", "ggmap"))
+install.packages(c("sp", "sf"))
+
+library(tidyverse) 
+library(janitor)   #Clean names
+library(patchwork) #Multi panel plots
+library(osmdata)   #OSM
+library(ggmap)     #Tidy gg maps
+library(purrr)     #Map functions
+library(sp)        #Spatial forms
+library(sf)        #Spatial forms
+```
+
+``` r
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+DEFINING FUNCTIONS
+==================
+
+1. Define the function for finding points
+-----------------------------------------
+
+``` r
+#Fairfax read OSM to output tibble (tidyr df)
+
+osm_to_df <- function(key = "leisure", value = "playground", type = "point") {
+#Read in playground data
+read.df <- getbb("fairfax county", format_out = "polygon") %>%
+  opq() %>%
+  add_osm_feature(key = key, value = value) %>%
+  osmdata_sf()
+    
+    if (type == "point" & !is.null(read.df$osm_points)) {
+      
+      lat.long.df <- do.call(rbind, st_geometry(read.df$osm_points)) %>% 
+        as_tibble() %>% 
+        setNames(c("longitude", "latitude")) %>%
+        mutate(object_id = 1:nrow(.) %>% as.factor()) %>%
+        dplyr::select(object_id, everything())
+      
+    } else if (type == "polygon" & !is.null(read.df$osm_polygons)) {
+      
+      poly.list <- do.call(rbind, st_geometry(read.df$osm_polygons)) %>%
+        lapply(as.tibble)
+      npolys    <- length(poly.list)
+      
+      lat.long.df <- tibble(
+        object_id = 1:npolys %>% as.factor(),
+        coord.df  = poly.list
+        ) %>%
+        unnest(coord.df) %>%
+        rename(
+        longitude = lon,
+        latitude  = lat
+        )
+      
+    } else if (type == "line" & !is.null(read.df$osm_lines)) {
+      
+      line.list <- do.call(list, st_geometry(read.df$osm_lines)) %>%
+        lapply(., rbind) %>%
+        lapply(., as.tibble)
+      nlines    <- length(line.list)
+      
+      lat.long.df <- tibble(
+        object_id = 1:nlines %>% as.factor(),
+        coord.df  = line.list
+        ) %>%
+        unnest(coord.df) %>%
+        rename(
+        longitude = lon,
+        latitude  = lat
+        )
+    } else {
+      ifelse(is.null(read.df$osm_points), stop("key/value incorrect or object type is empty"), 
+             ifelse(!(type %in% c("point", "polygon", "line")), stop("type is not point, polygon, or line"),
+                    stop("object type is empty, try another")))
+    }
+  
+  return(lat.long.df)
+
+}
+```
+
+2. Define the function for mapping
+----------------------------------
+
+``` r
+#Boundary and outline of Fairfax County
+fairfax.gg <- function() {
+fairfax.box <- getbb("fairfax county")
+fairfax.boundary <- getbb("fairfax county", format_out = "polygon") %>%
+  as.tibble() %>%
+  rename(longitude = `V1`, latitude = `V2`)
+
+#Grab the map info (many varieties)
+fairfax.map <- get_map(location = fairfax.box, source="stamen", maptype="watercolor", crop = TRUE)
+
+#ggmap and ggplot map and boundary
+ff.map <- ggmap(fairfax.map) +
+  geom_polygon(data = fairfax.boundary, aes(x = longitude, y = latitude), colour = "black", size = 1, alpha = 0.1) +
+  labs(
+    x = "Longitude",
+    y = "Latitude"
+  )
+  return(ff.map)
+}
+```
+
+3. Build the base Fairfax County map
+------------------------------------
+
+``` text
+ff.map <- fairfax.gg()
+```
+
+------------------------------------------------------------------------
+
+TESTING VALUES
+==============
+
+\*Google Maps used for proxy versus reality comparisons
+
+1. Fast Food
+------------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "fast_food", type = "point")
+
+#Add locations of fast food
+osm_point_plot <- function(ff.map, obj, value) {
+  if (!is.data.frame(obj)) stop("OSM object is not a data frame")
+  if (!is.ggplot(ff.map))  stop("Baseline Fairfax map is not a ggplot")
+  ff.map +
+  geom_point(data = obj, aes(x = longitude, y = latitude),
+             size = 0.1, colour = "red", alpha = 0.25) + 
+  geom_density_2d(data = obj, aes(x = longitude, y = latitude),
+                  colour = "purple", alpha = 0.5) +
+  labs(title = sprintf("Fairfax County %s", value))
+  }
+
+#Visualize
+osm_point_plot(ff.map, obj, "fast_food")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/read_food-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** Definitely pockets of concentration across the county, but overall availability is generally spread around Fairfax County.
+
+**Usable data (Y/N/M):** Y - numerous data points generally in line with density in county.
+
+**Proxy versus reality:** In comparison with Google Maps, data points seem mostly accurate, but Google Maps does not have as much of a concentration in northern area or a dispersion of points in southern area as the OSM does. Overall, OSM has more data points.
+
+2. Supermarkets
+---------------
+
+``` r
+obj <- osm_to_df(key = "shop", value = "supermarket", type = "point")
+osm_point_plot(ff.map, obj, "supermarket")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-2-1.png" width="90%" />
+
+### Findings:
+
+**Trends or connections:** Supermarket access is relatively evenly distributed in dense areas, while less dense areas have few to no supermarkets. Additionally, a greater concentration appears to exist in the central-western area.
+
+**Usable data (Y/N/M):** Y - Data seems accurate, and correlation between supermarkets and density comparatively results in food deserts in certain parts of the county.
+
+**Proxy versus reality:** Proxy data appears relatively similar to reality, but, similar to fast food, seems to have some more data points.
+
+3. Healthy Food Stores
+----------------------
+
+``` r
+#obj <- osm_to_df(key = "shop", value = "health_food", type = "point")
+
+#osm_point_plot(ff.map, obj, "health_food")
+```
+
+### **Findings:**
+
+Object is empty: no health food stores.
+
+**Usable data (Y/N/M):** N
+
+**Proxy versus reality:** There are fewer than 10 health food stores that pop up on Google Maps. It is likely that OSM classifies these data points as green grocers.
+
+4. Green Grocers
+----------------
+
+``` r
+obj <- osm_to_df(key = "shop", value = "greengrocer", type = "point")
+osm_point_plot(ff.map, obj, "greengrocer")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-4-1.png" width="90%" />
+
+``` r
+obj$object_id %>% unique() %>% length()
+```
+
+    ## [1] 6
+
+### **Findings:**
+
+**Trends or connections:** Only 7 points across the county, which are spread out in central-eastern area of Fairfax County (likely bleeding into Fairfax City).
+
+**Usable data (Y/N/M):** M - 7 data points that are not concentrated in any notable manner do not seem conclusive enough to include in our overall analysis. However, it may be useful to combine with supermarkets.
+
+**Proxy versus reality:** Google Maps places more green grocers in the central-western area (but qualifies a wider array of supermarkets as green grocers).\*
+
+5. Convenience Stores
+---------------------
+
+``` r
+obj <- osm_to_df(key = "shop", value = "convenience", type = "point")
+osm_point_plot(ff.map, obj, "convenience")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-5-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** Relatively scattered pockets. Consistent convenience stores exist from the northern to western border. Also, a wealth of convenience stores exists in the eastern region of Fairfax County, as well as along center of the county (likely spilling into Fairfax City).
+
+**Usable data (Y/N/M):** Y - OSM characterizes a convenience store as a "local shop carrying a small subset of the items you would find in a supermarket." Good data that adds more color to the distribution of supermarkets in the area, and could be combined with supermarket value.
+
+**Proxy versus reality:** Google Maps data does not reflect trend up W to N border, but has the same general scattering of the central E-W part of the county.
+
+**Note:** Although OSM describes convenience stores as a smaller version of a supermarket, I tend to think of these shops as leaning more heavily towards alcohol sales. An example of a convenience store on Google Maps is 7-Eleven. Therefore, this does not equate to a supermarket alternative, but is also not solely an alcohol store. I don't think it makes sense to group convenience stores with just supermarkets or just with alcohol stores, but perhaps as some hybrid alternative.
+
+6. Alcohol Stores
+-----------------
+
+``` r
+obj <- osm_to_df(key = "shop", value = "alcohol", type = "point")
+osm_point_plot(ff.map, obj, "alcohol")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-6-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** There is a northwestern and eastern sprinkling of alcohol stores. Other areas have few to none.
+
+**Usable data (Y/N/M):** M - This is an important value to include, but, in general, it seems as though there should be more data points for alcohol stores in Fairfax County.
+
+**Proxy versus reality:** More alcohol stores are visible on Google Maps, but there is a similar concentration in eastern and slightly in western region.\*
+
+7. Bars
+-------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "bar", type = "point")
+osm_point_plot(ff.map, obj, "bar")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-7-1.png" width="90%" />
+
+``` r
+obj$object_id %>% unique() %>% length()
+```
+
+    ## [1] 113
+
+### **Findings:**
+
+**Trends or connections:** Bars are widely dispersed across county. No heavy concentrations within Fairfax County, but some directly outside of boundaries
+
+**Usable data (Y/N/M):** M - This could be used in conjunction with other values, as there is not a whole lot of data here to use on its own.
+
+**Proxy versus reality:** Google Maps brings up a concentration of bars in central eastern area of Fairfax (part of which likely falls in Fairfax City). Therefore, Google Maps data is not as dispersed as OSM data. Additionally, Google Maps data has more data points than OSM.
+
+8. Restaurants
+--------------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "restaurant", type = "point")
+osm_point_plot(ff.map, obj, "restaurant")
+```
+
+    ## Warning: Removed 6 rows containing non-finite values (stat_density2d).
+
+    ## Warning: Removed 6 rows containing missing values (geom_point).
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-8-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** Concentrations of restaurants in denser areas of the county.
+
+**Usable data (Y/N/M):** Y - This data looks accurate, is relevant to our project, and correlates to county density.
+
+Proxy versus reality: The proxy data is relatively similar to reality, but OSM data shows more points than that of Google Maps.
+
+9. Food Courts
+--------------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "food_court", type = "point")
+osm_point_plot(ff.map, obj, "food_court")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-9-1.png" width="90%" />
+
+### **Findings: None visible in the County. Not relevant.**
+
+**Trends or connections:** N/A
+
+**Usable data (Y/N/M):** N
+
+**Proxy versus reality:** Google Maps has some data points, but these seem more like restaurants than traditional food courts.
+
+10. Pubs
+--------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "pub", type = "point")
+osm_point_plot(ff.map, obj, "pub")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** Small concentrations in lower Eastern and N-W area.
+
+**Usable data (Y/N/M):** M - Might be useful if compiled with bars data, but not enough information on its own.
+
+**Proxy versus reality:** a lot more pubs come up on Google Maps, but Google Maps likely characterizes pubs more broadly. Therefore, the Google Maps data likely includes some data that would be captured by the value "bars" in OSM.
+
+11. Beverages
+-------------
+
+``` r
+obj <- osm_to_df(key = "shop", value = "beverages", type = "point")
+osm_point_plot(ff.map, obj, "beverages")
+```
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-11-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** N/A
+
+**Usable data (Y/N/M):** N - Seems to be fewer than 5 data points in county. This could have been useful, as OSM defines these shops as those selling both alcoholic and non-alcoholic beverages, but it is not worth including, as there are so few points.
+
+**Proxy versus reality:** a lot more data points pop up on Google Maps (the parameters for the search term "beverage" are probably much broader on Google Maps than on OSM).\*
+
+12. Gas Stations
+----------------
+
+``` r
+obj <- osm_to_df(key = "amenity", value = "fuel", type = "point")
+osm_point_plot(ff.map, obj, "fuel")
+```
+
+    ## Warning: Removed 6 rows containing non-finite values (stat_density2d).
+
+    ## Warning: Removed 6 rows containing missing values (geom_point).
+
+<img src="osm_exploration_eliza_files/figure-markdown_github/unnamed-chunk-12-1.png" width="90%" />
+
+### **Findings:**
+
+**Trends or connections:** As usual, there are more points in denser areas. The area of the county with the greatest concentration of stations is in the eastern section. Overall, gas station availability is relatively dispersed throughout the county, besides in more rural areas.
+
+**Usable data (Y/N/M):** M - Gas stations are typically a place where one can also find cheap food, but it is unclear whether OSM defines gas stations in the same way. See note below.
+
+**Proxy versus reality:** OSM has more points than Google Maps.
+
+**Note:** OSM defines fuel stations as "Petrol station; gas station; marine fuel." This definition seems more limited than what one typically associates with a gas station (i.e. a convenience store and a place to get gas). Therefore, it is possible that these points are the gas stations in Fairfax County that are solely locations to get gas.
+
+ISSUES:
+=======
+
+1.  Google Maps as a reality comparison: Google Maps often does not give all of a searched for value in Fairfax County, but instead gives outputs along E-W line across of the county (concentrated around Fairfax City), leaving out northern and southern areas in the process.
+
+\*For certain values, I generalized the Google Maps reality comparison search term to Fairfax County instead of "Fairfax County," as the latter returned no results when paired with certain values. The lack of quotations likely construed the reality comparison to concentrate in Fairfax City.(EX: green grocers Fairfax County instead of "green grocers Fairfax County," or a variation of the latter)
