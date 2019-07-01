@@ -3,8 +3,8 @@ title: "Dimensional Analysis - PCA"
 author: "Quinton Neville"
 date: "7/1/2019"
 output:
-  html_document: default
   github_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning = FALSE}
