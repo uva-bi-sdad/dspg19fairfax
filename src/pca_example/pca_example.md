@@ -164,3 +164,81 @@ fviz_pca_var(pca.cor.hs,
 #list(a = tibble(x = 1:10, y = 11:20),
 #     b = tibble(x = 1:5, y = 6:10)) %>% map(., ~map_dbl(., median))
 ```
+
+#### Supervisor District
+
+``` r
+#Read and filter
+supervisor.df <- acs.df %>%
+  filter(id_type %in% "supervisor_district") %>%
+  dplyr::select(-id_type) %>%
+  dplyr::select(-contains('moe'))
+
+#Scale
+highschool.df <- bind_cols(highschool.df %>%
+                             dplyr::select(id), 
+                           highschool.df %>%
+                             dplyr::select_if(is.numeric) %>%
+                             map_df(scale))
+
+#Grab Principal Components
+#pca.hs <- highschool.df %>% 
+#  dplyr::select_if(is.numeric) %>%
+#  princomp()
+
+#Grabe PC's from Correlation matrix
+pca.cor.sv <- supervisor.df %>% 
+  dplyr::select_if(is.numeric) %>%
+  cor() %>%
+  princomp()
+
+#Parallel analysis
+#highschool.df %>% select_if(is.numeric) %>% fa.parallel()
+
+#Scree Plot for correlation components
+fviz_eig(pca.cor.sv)
+```
+
+<img src="pca_example_files/figure-markdown_github/unnamed-chunk-8-1.png" width="90%" />
+
+``` r
+#Feature map
+fviz_pca_var(pca.cor.hs,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+```
+
+<img src="pca_example_files/figure-markdown_github/unnamed-chunk-8-2.png" width="90%" />
+
+#### Highschool + Housing Stock
+
+``` r
+ffh.highschool.df <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+  janitor::clean_names() %>%
+  dplyr::select(-c(geoid, parcel_id, district)) %>%
+  rename(id = highschool) %>%
+    nest(-id) %>%
+    mutate(
+      data   = map(data, ~dplyr::select_if(., is.numeric)) %>%
+               map(na.omit),
+      median = data %>% map(.x = ., ~map_dbl(., median)),
+      median = median %>% map(.x = ., ~as_tibble(as.list(.x)))
+    ) %>%
+    dplyr::select(-c(data)) %>%
+  unnest()
+
+ffh.district.df<- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+  janitor::clean_names() %>%
+  dplyr::select(-c(geoid, parcel_id, highschool)) %>%
+  rename(id = district) %>%
+    nest(-id) %>%
+    mutate(
+      data   = map(data, ~dplyr::select_if(., is.numeric)) %>%
+               map(na.omit),
+      median = data %>% map(.x = ., ~map_dbl(., median)),
+      median = median %>% map(.x = ., ~as_tibble(as.list(.x)))
+    ) %>%
+    dplyr::select(-c(data)) %>%
+  unnest() 
+```
