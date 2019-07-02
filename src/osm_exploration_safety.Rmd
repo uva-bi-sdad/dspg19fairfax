@@ -13,12 +13,12 @@ output:
 knitr::opts_knit$set(echo = TRUE,
                      root.dir = rprojroot::find_rstudio_root_file())
 
-install.packages("dplyr") # new  version
-install.packages(c("snakecase", "janitor")) #tidy names
-install.packages("pillar") #Dependency for patchwork
-devtools::install_github("thomasp85/patchwork") #For multi-panel plots
-install.packages(c("osmdata", "ggmap"))
-install.packages(c("sp", "sf"))
+##install.packages("dplyr") # new  version
+##install.packages(c("snakecase", "janitor")) #tidy names
+##install.packages("pillar") #Dependency for patchwork
+##devtools::install_github("thomasp85/patchwork") #For multi-panel plots
+##install.packages(c("osmdata", "ggmap"))
+##install.packages(c("sp", "sf"))
 
 library(tidyverse) 
 library(janitor)   #Clean names
@@ -227,14 +227,68 @@ osm_point_plot(ff.map, obj, "Pawnbrokers")
 
 ### **Findings:**
 
-**Trends or connections:** N/A. There appears to be one pawnbroker in Fairfax County.
+**Trends or connections:** There are very few data points. The car part shops seem to be in the center and eastern areas of the county.
   
-**Usable data (Y/N/M):** N - There is only one pawnbroker data point.
+**Usable data (Y/N/M):** M - there are not enough data points to conclusively analyze by itself. It is likely that many "car part" stores share a lot of overlap with "car repair" shops in terms of services and products offered. Therefore, it is possible that car part stores may be characterized as car repair shops on OSM. I think that "car repair" and "car part" shops can be combined into one variable.
 
-**Proxy versus reality:** There appears to be 4 or 5 data points on Google Maps (although one might be in Fairfax City).
+**Proxy versus reality:** Google Maps shows many more data points than OSM.
 
+##6. Charity Shops
 
+```{r}
+obj <- osm_to_df(key = "shop", value = "charity", type = "point")
+osm_point_plot(ff.map, obj, "Charity Shops")
+```
 
+### **Findings:**
 
+**Trends or connections:** There appears to be one charity shop in Fairfax County.
+  
+**Usable data (Y/N/M):** N - one data point is not sufficient for analysis. 
 
+**Proxy versus reality:** Google Maps has more data points, but these seem to also include thrift shops. 
 
+##7. Second Hand Stores
+
+```{r}
+obj <- osm_to_df(key = "shop", value = "second_hand", type = "point")
+osm_point_plot(ff.map, obj, "Second Hand Shops")
+```
+
+### **Findings:**
+
+**Trends or connections:** Again, not many data points (fewer than 10). These are mostly found in eastern area. 
+  
+**Usable data (Y/N/M):** N - There are not many data points, and the data seems sparse in comparison to reality. 
+
+**Proxy versus reality:** There are a lot more data points on Google Maps for second hand stores. These data points are spread out across the county.
+
+##8. Variety Stores
+
+```{r}
+obj <- osm_to_df(key = "shop", value = "variety_store", type = "point")
+osm_point_plot(ff.map, obj, "Variety Stores")
+```
+
+### **Findings:**
+
+**Trends or connections:** There are minimal data points. The available data is mostly found in the eastern part of the county.
+  
+**Usable data (Y/N/M):** N - Unless variety stores is combined with thrift and charity shops, there is not enough data to come to any conclusions.
+
+**Proxy versus reality:** Google Maps also shows fewer than 10 variety stores, but these points are more spread out in the county.
+
+##9. Tobacco Stores
+
+```{r}
+obj <- osm_to_df(key = "shop", value = "tobacco", type = "point")
+osm_point_plot(ff.map, obj, "Tobacco Stores")
+```
+
+### **Findings:**
+
+**Trends or connections:** There are minimal points (fewer than five).
+  
+**Usable data (Y/N/M):** N - There appears to be one data point. Shops for purchasing tobacco are probably accounted for in gas stations and/or convenience stores.
+
+**Proxy versus reality:** Google Maps also yields few results for tobacco stores. It seems as though there aren't many stores that sell solely tobacco.
