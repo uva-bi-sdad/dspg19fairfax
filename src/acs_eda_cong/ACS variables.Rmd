@@ -1,0 +1,78 @@
+---
+title: "ACS variables exploration"
+author: "Cong Cong"
+date: "7/1/2019"
+output:
+  github_document: default
+  html_document: default
+---
+  
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Installation Libraries if needed
+
+#Libraries
+library(tidyverse)
+library(janitor) #Also needs library(snakecase) as dependencies
+library(viridis)
+library(purrr)
+library(stringr)
+
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+  #  fig.height =   
+  fig.width = 6,
+  #  fig.asp = .5,
+  out.width = "90%",
+  #  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#1. Example Read and Explore Age data
+
+```{r message = FALSE}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r warning = FALSE, message = FALSE}
+#1. Data Description  
+acs.age.df <- acs.df %>% dplyr:: select("id_type","id",starts_with("age")) 
+```
+
+
+```{r}
+#Dimension
+age.dim  <- acs.age.df %>% select(ends_with("est")) %>% dim()
+
+#Count by districts
+acs.age.df %>% group_by(id_type) %>% summarise(count=n()) %>% knitr::kable(digits = 3)
+
+#Age groups
+age.vars <- str_extract(names(acs.age.df), "(?<=age).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.age.df),
+  Count = acs.age.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.age.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+The age data contain `r age.dim[1]` observations aggregated by four geographic units. `r length(age.vars)`age groups: `r age.vars`. In each age group, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+
