@@ -234,20 +234,35 @@ travel.time <- function(latitude    = 38.842669,
                         longitude   = -77.270272, 
                         travel.mode = c("walking", "cycling", "driving", "public_transport"),
                         time        = 1200,
-                        departure   = "2019-6-26T08:00:00Z") {
-  
-  travel.mode %>%
-      map(.x = ., ~ traveltime_map(appId      = app.id,
+                        departure   = "2019-7-8T08:00:00Z") {
+  #Grab travel df for each travel mode
+      map(travel.mode, function(x) {
+        travel.obj <- traveltime_map(appId    = app.id,
                                    apiKey     = app.key,
                                    location   = c(latitude, longitude),
                                    traveltime = time,
-                                   type       = .x,
+                                   type       = x,
                                    departure  = departure) %>%
-        mutate(travel_mode = .x)) %>%
+        mutate(travel_mode = x)
+        Sys.sleep(6)
+        return(travel.obj)
+        }) %>%
         do.call(rbind.data.frame, .) %>%
         as_tibble()
-  Sys.sleep(6.4/10)
 }
+
+
+func <- function(x) {traveltime_map(appId      = app.id,
+                                   apiKey     = app.key,
+                                   location   = c(latitude, longitude),
+                                   traveltime = time,
+                                   type       = x,
+                                   departure  = departure) %>%
+        mutate(travel_mode = x)
+        Sys.sleep(6)
+}
+
+func("walking")
 
 map.var.time <- function(osm.df,                        
                         travel.mode = c("walking", "cycling", "driving", "public_transport"),
@@ -269,9 +284,11 @@ iterative.grid <- expand.grid()
 
 #Test Function 1
 a <- Sys.time()
-travel.time(travel.mode = "walking")
+travel.time(travel.mode = c("walking", "driving"))
 b <- Sys.time()
 b - a
+
+
 #geosphere for centroid(x), x ~ two column long, lat matrix
 ```
 
