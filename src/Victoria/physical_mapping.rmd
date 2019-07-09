@@ -3,8 +3,8 @@ title: "Economic Vulnerability"
 author: "VH"
 date: "6/20/2019"
 output: 
-  github_document: default
   html_document: default
+  github_document: default
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning = FALSE}
@@ -173,73 +173,152 @@ osm_filepath_gen <- function(data.folder, file.type, key, value, type) {
                      file.type)
   return(file.path)
 }
+
 ```
 
 
 ```{r}
-
 ff.map <- fairfax.gg()
-ff.map
 play.df <- osm_to_df(key = "leisure", value = "playground", type = "point")
-play.df
 playground.gg <- osm_point_plot(ff.map, play.df, "Playgrounds")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
 ```
 
-COMMENTS: No way to cross check playgrounds on GMAPS...
+Playground Observations: No way to cross check playgrounds on GMAPS!...
+But, overall the points appear evenly spread & useable  
+Use: Yes
 
 ```{r}
+
 ff.map <- fairfax.gg()
-ff.map
 play.df <- osm_to_df(key = "leisure", value = "park", type = "polygon")
-play.df
 playground.gg <- osm_poly_plot(ff.map, play.df, "Parks")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
 ```
+OSM definition: "Open space for recreational use, usually designed and in semi-natural state with grassy areas, trees and bushes." 
 
-COMMENT; useful but accuracy questionable
-cross-check on fairfax. Perhaps it excludes the nature reserves? website:https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019
+Park Observation:Useful but accuracy questionable -> We may need to overlay the nature reserve/national park/garden maps to have a similar map? Cross check with Fairfax website data:
+
+https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019
+
+Use: Yes
 
 ```{r}
+
 ff.map <- fairfax.gg()
-ff.map
 play.df <- osm_to_df(key = "leisure", value = "swimming_pool", type = "point")
-play.df
 playground.gg <- osm_point_plot(ff.map, play.df, "Swimming Pools")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
 ```
 
-COMMENT: Looks decent.
-Compare to fairfax website: https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048
+Pool Observation: Looks decent. 
+
+We can compare acuracy with Fairfax website data: https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048
+
+Use: Yes
 
 ```{r}
+
 ff.map <- fairfax.gg()
-ff.map
 play.df <- osm_to_df(key = "leisure", value = "fitness_centre", type = "point")
-play.df
 playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Centers")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 ```
 
+Fitness Center Observations: This is not reliable... not enough data points!
 
-NOTE: we MIGHT want the next one ... your call.
-
-
+Use: No
 ```{r}
+
 ff.map <- fairfax.gg()
-ff.map
 play.df <- osm_to_df(key = "leisure", value = "sports_centre", type = "point")
-play.df
-playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centres")  
+playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centers")  
 playground.gg  
 play.df$object_id %>% unique() %>% length()
 
 ```
+Use: 
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "nature_reserve", type = "polygon")
+playground.gg <- osm_poly_plot(ff.map, play.df, "Nature Reserves")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "boundary", value = "national_park", type = "polygon")
+playground.gg <- osm_poly_plot(ff.map, play.df, "National Parks")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+
+
+
+
+
+
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "dog_park", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Dog Parks")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+
+
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "garden", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Gardens")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "track", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Tracks")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+Track Obs: 
+
+
+
+```{r}
+
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "fitness_station", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Stations")  
+playground.gg  
+play.df$object_id %>% unique() %>% length()
+
+``` 
+
+Fitess Station Observations: Represent outdoor public fitness equipment; not enough points!
+Use: No
 

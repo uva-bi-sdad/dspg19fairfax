@@ -1,0 +1,439 @@
+---
+title: "Pre-PCA"
+author: "VH"
+date: "7/3/2019"
+output: html_document
+---
+```{r}
+library(tidyverse)
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+```
+
+
+
+
+PUBLIC ASSISTANCE INCOME (PAI)
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+#1. Data Description  
+acs.PAI.df <- acs.df %>% select("id_type","id",contains('pai')) 
+
+#Dimension
+PAI.dim  <- acs.PAI.df %>% select(ends_with("est")) %>% dim()
+
+PAI.vars <- str_extract(names(acs.PAI.df), "(?<=no_pai|pai).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.PAI.df),
+  Count = acs.PAI.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.PAI.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+```{r}
+
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  knitr::kable() 
+  dt.pct
+}
+
+acs.PAI.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+acs.PAI.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+
+
+
+SUPPLEMENTAL SECURITY INCOME (SSI)
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+#1. Data Description  
+acs.SSI.df <- acs.df %>% select("id_type","id",contains('ssi')) 
+
+#Dimension
+SSI.dim  <- acs.SSI.df %>% select(ends_with("est")) %>% dim()
+
+SSI.vars <- str_extract(names(acs.SSI.df), "(?<=no_ssi|ssi).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.SSI.df),
+  Count = acs.SSI.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.SSI.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+```{r}
+
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+```
+
+```{r}
+acs.SSI.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+```{r}
+acs.SSI.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+
+
+
+
+UNENROLLED IN SCHOOL 
+
+NOTE:
+Something is odd here -> There are more enrolled than unenrolled?
+Is this a mix-up, or am I misunderstanding the term?
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+#1. Data Description  
+acs.unschool.df <- acs.df %>% select("id_type","id",contains('enrolled')) 
+
+#Dimension
+unschool.dim  <- acs.unschool.df %>% select(ends_with("est")) %>% dim()
+
+unschool.vars <- str_extract(names(acs.unschool.df), "(?<=unenrolled|enrolled).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.unschool.df),
+  Count = acs.unschool.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.unschool.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+```{r}
+
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+```
+
+```{r}
+acs.unschool.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+```{r}
+acs.unschool.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+
+
+
+
+POVERTY
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+#1. Data Description  
+acs.poverty.df <- acs.df %>% select("id_type","id",contains('poverty')) 
+
+#Dimension
+poverty.dim  <- acs.poverty.df %>% select(ends_with("est")) %>% dim()
+
+poverty.vars <- str_extract(names(acs.poverty.df), "(?<=nonpoverty|poverty).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.poverty.df),
+  Count = acs.poverty.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.poverty.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+```{r}
+
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+```
+
+```{r}
+acs.poverty.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+```{r}
+acs.poverty.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+
+
+
+HEALTH INSURANCE COVERAGE
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+#1. Data Description  
+acs.HICOV.df <- acs.df %>% select("id_type","id",contains('hicov')) 
+
+#Dimension
+HICOV.dim  <- acs.HICOV.df %>% select(ends_with("est")) %>% dim()
+
+HICOV.vars <- str_extract(names(acs.HICOV.df), "(?<=nohicov|hicov).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.HICOV.df),
+  Count = acs.HICOV.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.HICOV.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+```{r}
+
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+```
+
+```{r}
+acs.HICOV.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+```{r}
+acs.HICOV.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+
+
+
+COMMUTE TIME - start converting code to means for bins 
+
+```{r}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("/home/vh5dg/dspg19fairfax/data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r}
+
+acs.Commute.df <- acs.df %>% select("id_type","id",contains('min')) 
+
+Commute.dim  <- acs.Commute.df %>% select(ends_with("est")) %>% dim()
+
+Commute.vars <- str_extract(names(acs.Commute.df), "(?<=min).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+```
+
+```{r}
+
+find_med <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  
+  dt$SUM = ((rowSums( dt[ sapply(dt, is.numeric)] ))/4)
+  dt.med <- dt %>% 
+    mutate_if(is.numeric, funs(round(./2,2)))
+  
+  colnames(dt.med) <- gsub("est","med",colnames(dt.med))
+  dt.med
+}
+```
+
+```{r}
+acs.Commute.df %>% filter(id_type=="census_tract") %>%
+  find_med() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., ""))) %>%
+  knitr::kable() 
+```
+
+
+```{r}
+acs.Commute.df %>% filter(id_type=="highschool_district") %>%
+  find_med() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., ""))) %>%
+  knitr::kable() 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+USE FOR SOMETHING THAT WORKS WITH VISUALIZATION!!!!
+
+
+```{r}
+# Visualize the distribution by census tracts
+PAI.pct <- acs.PAI.df %>%
+  filter(id_type=="census_tract") %>% 
+  find_pct() %>% 
+  select(-SUM) %>% 
+  gather(key = variable, value = value, -c(id, id_type))
+
+ggplot(data=PAI.pct, aes(x=variable, y=value, group=id)) +
+  geom_line() +
+  geom_point() +
+  labs(title="Public Assistance Income Distribution by Census Tracts",x="PAI", y = "Percentage (%)") +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+```
+
+```{r}
+# Visualize the distribution by school districts
+PAI.pct <- acs.PAI.df %>%
+  filter(id_type=="highschool_district") %>% 
+  find_pct() %>% 
+  select(-SUM) %>% 
+  gather(key = variable, value = value, -c(id, id_type))
+
+ggplot(data=PAI.pct, aes(x=variable, y=value, group=id)) +
+  geom_line() +
+  geom_point() +
+  labs(title="Public Assistance Income Distribution by Highschool Districts",x="PAI", y = "Percentage (%)") +
+  theme(axis.text.x = element_text(angle = 90)) 
+```
+
+```{r}
+#Sum of population in each age group across all districts
+sum_plot <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  plot <- dt %>% select_if(is.numeric)%>% colSums(.)%>% as.data.frame()
+  colnames(plot) <- "count"
+  ggplot(data=plot, aes(x=rownames(plot), y=count)) + 
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("PAI distribution in", unique(dt$id_type)),
+         x="PAI", y = "Percentage (%)") 
+}
+
+acs.PAI.df %>% filter(id_type=="census_tract") %>% sum_plot()
+
+```
+
+```{r}
+acs.PAI.df %>% filter(id_type=="highschool_district") %>% sum_plot()
+```
+
+
+
