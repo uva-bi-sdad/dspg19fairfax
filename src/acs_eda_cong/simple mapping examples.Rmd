@@ -1,12 +1,21 @@
+---
+title: "simple mapping examples"
+author: "Cong Cong"
+date: "7/9/2019"
+output:
+  github_document: default
+  html_document: default
+---
+```{r setup, message = FALSE, warning = FALSE}
 library(sf)
 library(tidyverse)
 library(tigris)
 knitr::opts_knit$set(echo = TRUE,
                      root.dir = rprojroot::find_rstudio_root_file())
+```
 
-
-# Plot median house value by school district --------
-
+# Plot median house value by school district
+```{r, message = FALSE, warning = FALSE}
 # Read in the housing stock data
 housing <- read.csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv")
 
@@ -25,10 +34,10 @@ median_by_school<-merge(school_shp,medvalue,by.x='SCHOOL_NAM',by.y='HIGHSCHOOL',
 # Plot
 ggplot(median_by_school)+
   geom_sf(aes(fill=Count))
+```
 
-
-# Plot unemployment rate by school district ----------------------------------
-
+# Plot unemployment rate by school district
+```{r,  message = FALSE, warning = FALSE}
 # Read in the ACS data
 acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
 
@@ -46,3 +55,4 @@ unemp_by_school<-merge(school_shp,acs.emp,by.x='SCHOOL_NAM',by.y='id',all.x=TRUE
 # Plot
 ggplot(unemp_by_school)+
   geom_sf(aes(fill=unemployed_pct))
+```
