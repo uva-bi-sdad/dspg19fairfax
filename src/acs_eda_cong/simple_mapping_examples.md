@@ -1,12 +1,9 @@
----
-title: "simple mapping examples"
-author: "Cong Cong"
-date: "7/9/2019"
-output:
-  github_document: default
-  html_document: default
----
-```{r setup, message = FALSE, warning = FALSE}
+simple mapping examples
+================
+Cong Cong
+7/9/2019
+
+``` r
 library(sf)
 library(tidyverse)
 library(tigris)
@@ -15,7 +12,8 @@ knitr::opts_knit$set(echo = TRUE,
 ```
 
 ### Plot median housing value by school district
-```{r, message = FALSE, warning = FALSE}
+
+``` r
 # Read in the housing stock data
 housing <- read.csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv")
 
@@ -27,7 +25,17 @@ medvalue <- housing_value %>% group_by(HIGHSCHOOL) %>% na.omit() %>% summarise(M
 
 # Read in the geographies:
 school_shp <- st_read("./data/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp")
+```
 
+    ## Reading layer `High_School_Attendance_Areas' from data source `/home/sdad/project_data/ffx/dspg2019fairfax/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp' using driver `ESRI Shapefile'
+    ## Simple feature collection with 25 features and 18 fields
+    ## geometry type:  MULTIPOLYGON
+    ## dimension:      XY
+    ## bbox:           xmin: -77.53701 ymin: 38.61731 xmax: -77.04145 ymax: 39.05769
+    ## epsg (SRID):    4326
+    ## proj4string:    +proj=longlat +datum=WGS84 +no_defs
+
+``` r
 # Join with the school district shapefile
 median_by_school<-merge(school_shp,medvalue,by.x='SCHOOL_NAM',by.y='HIGHSCHOOL',all.x=TRUE)
 
@@ -36,8 +44,11 @@ ggplot(median_by_school)+
   geom_sf(aes(fill=Count))
 ```
 
+![](simple_mapping_examples_files/figure-markdown_github/unnamed-chunk-1-1.png)
+
 ### Plot unemployment rate by school district
-```{r,  message = FALSE, warning = FALSE}
+
+``` r
 # Read in the ACS data
 acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
 
@@ -56,3 +67,5 @@ unemp_by_school<-merge(school_shp,acs.emp,by.x='SCHOOL_NAM',by.y='id',all.x=TRUE
 ggplot(unemp_by_school)+
   geom_sf(aes(fill=unemployed_pct))
 ```
+
+![](simple_mapping_examples_files/figure-markdown_github/unnamed-chunk-2-1.png)
