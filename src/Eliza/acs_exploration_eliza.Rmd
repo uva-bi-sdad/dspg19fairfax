@@ -40,7 +40,7 @@ options(scipen = 999999)
 ```
 
 #Read in Data
-```{r, message = FALSE, warning = FALSE}}
+```{r, message = FALSE, warning = FALSE}
 #Read in the ACS wide and ACS long (tidy) data
 acs.df <- read_csv("/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
 #acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
