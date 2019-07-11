@@ -471,7 +471,7 @@ master_census_dataset = bind_cols(master_census_dataset %>%
                                     map_df(., as.numeric))
 
 
-write.csv(master_census_dataset, "master_census_dataset.csv")
+#write.csv(master_census_dataset, "./data/working/ACS_final_index/master_census_dataset.csv")
 ```
 
 

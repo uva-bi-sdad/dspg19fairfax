@@ -171,36 +171,11 @@ ff.map <- fairfax.gg()
     ## Source : http://tile.stamen.com/terrain/11/585/785.png
 
 ``` r
-ff.map
-```
-
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-1-1.png" width="90%" />
-
-``` r
 play.df <- osm_to_df(key = "leisure", value = "playground", type = "point")
 ```
 
     ## Warning: `as_tibble.matrix()` requires a matrix with column names or a `.name_repair` argument. Using compatibility `.name_repair`.
     ## This warning is displayed once per session.
-
-``` r
-play.df
-```
-
-    ## # A tibble: 9,600 x 3
-    ##    object_id longitude latitude
-    ##    <fct>         <dbl>    <dbl>
-    ##  1 1             -77.1     39.0
-    ##  2 2             -77.1     39.0
-    ##  3 3             -77.1     39.0
-    ##  4 4             -77.1     38.8
-    ##  5 5             -77.1     38.8
-    ##  6 6             -77.1     38.8
-    ##  7 7             -77.1     38.9
-    ##  8 8             -77.1     38.9
-    ##  9 9             -77.1     38.9
-    ## 10 10            -77.1     38.9
-    ## # … with 9,590 more rows
 
 ``` r
 playground.gg <- osm_point_plot(ff.map, play.df, "Playgrounds")  
@@ -211,86 +186,58 @@ playground.gg
 
     ## Warning: Removed 2 rows containing missing values (geom_point).
 
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-1-2.png" width="90%" />
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-1-1.png" width="90%" />
 
 ``` r
 play.df$object_id %>% unique() %>% length()
 ```
 
-    ## [1] 9600
+    ## [1] 9614
 
-COMMENTS: No way to cross check playgrounds on GMAPS...
+Playground Observations: No way to cross check playgrounds on GMAPS!... But, overall the points appear evenly spread & useable
+Use: Yes
 
 ``` r
 ff.map <- fairfax.gg()
-ff.map
-```
-
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-2-1.png" width="90%" />
-
-``` r
 play.df <- osm_to_df(key = "leisure", value = "park", type = "polygon")
-play.df
 ```
 
-    ## # A tibble: 58,371 x 3
-    ##    object_id longitude latitude
-    ##    <fct>         <dbl>    <dbl>
-    ##  1 1             -77.1     39.0
-    ##  2 1             -77.1     39.0
-    ##  3 1             -77.1     39.0
-    ##  4 1             -77.1     39.0
-    ##  5 1             -77.1     39.0
-    ##  6 1             -77.1     39.0
-    ##  7 1             -77.1     39.0
-    ##  8 1             -77.1     39.0
-    ##  9 1             -77.1     39.0
-    ## 10 1             -77.1     39.0
-    ## # … with 58,361 more rows
+    ## Warning: Unquoting language objects with `!!!` is deprecated as of rlang 0.4.0.
+    ## Please use `!!` instead.
+    ## 
+    ##   # Bad:
+    ##   dplyr::select(data, !!!enquo(x))
+    ## 
+    ##   # Good:
+    ##   dplyr::select(data, !!enquo(x))    # Unquote single quosure
+    ##   dplyr::select(data, !!!enquos(x))  # Splice list of quosures
+    ## 
+    ## This warning is displayed once per session.
 
 ``` r
 playground.gg <- osm_poly_plot(ff.map, play.df, "Parks")  
 playground.gg  
 ```
 
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-2-2.png" width="90%" />
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-2-1.png" width="90%" />
 
 ``` r
 play.df$object_id %>% unique() %>% length()
 ```
 
-    ## [1] 1727
+    ## [1] 1730
 
-COMMENT; useful but accuracy questionable cross-check on fairfax. Perhaps it excludes the nature reserves? website:<https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019>
+OSM definition: "Open space for recreational use, usually designed and in semi-natural state with grassy areas, trees and bushes."
+
+Park Observation:Useful but accuracy questionable -&gt; We may need to overlay the nature reserve/national park/garden maps to have a similar map? Cross check with Fairfax website data:
+
+<https://data-fairfaxcountygis.opendata.arcgis.com/datasets/county-parks?geometry=-78.124%2C38.645%2C-76.197%2C39.019>
+
+Use: Yes
 
 ``` r
 ff.map <- fairfax.gg()
-ff.map
-```
-
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-3-1.png" width="90%" />
-
-``` r
 play.df <- osm_to_df(key = "leisure", value = "swimming_pool", type = "point")
-play.df
-```
-
-    ## # A tibble: 12,512 x 3
-    ##    object_id longitude latitude
-    ##    <fct>         <dbl>    <dbl>
-    ##  1 1             -77.1     38.9
-    ##  2 2             -77.1     38.8
-    ##  3 3             -77.1     38.8
-    ##  4 4             -77.1     38.8
-    ##  5 5             -77.1     38.8
-    ##  6 6             -77.1     38.9
-    ##  7 7             -77.1     38.9
-    ##  8 8             -77.1     38.9
-    ##  9 9             -77.1     38.9
-    ## 10 10            -77.1     38.9
-    ## # … with 12,502 more rows
-
-``` r
 playground.gg <- osm_point_plot(ff.map, play.df, "Swimming Pools")  
 playground.gg  
 ```
@@ -299,49 +246,23 @@ playground.gg
 
     ## Warning: Removed 9 rows containing missing values (geom_point).
 
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-3-2.png" width="90%" />
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-3-1.png" width="90%" />
 
 ``` r
 play.df$object_id %>% unique() %>% length()
 ```
 
-    ## [1] 12512
+    ## [1] 12564
 
-COMMENT: Looks decent. Compare to fairfax website: <https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048>
+Pool Observation: Looks decent.
+
+We can compare acuracy with Fairfax website data: <https://data-fairfaxcountygis.opendata.arcgis.com/datasets/community-pools?geometry=-78.05%2C38.674%2C-76.124%2C39.048>
+
+Use: Yes
 
 ``` r
 ff.map <- fairfax.gg()
-ff.map
-```
-
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-4-1.png" width="90%" />
-
-``` r
 play.df <- osm_to_df(key = "leisure", value = "fitness_centre", type = "point")
-```
-
-    ## Request failed [429]. Retrying in 1.9 seconds...
-
-``` r
-play.df
-```
-
-    ## # A tibble: 205 x 3
-    ##    object_id longitude latitude
-    ##    <fct>         <dbl>    <dbl>
-    ##  1 1             -77.1     38.9
-    ##  2 2             -77.1     38.9
-    ##  3 3             -77.1     38.9
-    ##  4 4             -77.1     38.9
-    ##  5 5             -77.1     38.9
-    ##  6 6             -77.1     38.9
-    ##  7 7             -77.1     38.9
-    ##  8 8             -77.1     38.9
-    ##  9 9             -77.1     38.9
-    ## 10 10            -77.1     38.9
-    ## # … with 195 more rows
-
-``` r
 playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Centers")  
 playground.gg  
 ```
@@ -350,45 +271,22 @@ playground.gg
 
     ## Warning: Removed 6 rows containing missing values (geom_point).
 
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-4-2.png" width="90%" />
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-4-1.png" width="90%" />
 
 ``` r
 play.df$object_id %>% unique() %>% length()
 ```
 
-    ## [1] 205
+    ## [1] 243
 
-NOTE: we MIGHT want the next one ... your call.
+Fitness Center Observations: This is not reliable... not enough data points!
+
+Use: No
 
 ``` r
 ff.map <- fairfax.gg()
-ff.map
-```
-
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-5-1.png" width="90%" />
-
-``` r
 play.df <- osm_to_df(key = "leisure", value = "sports_centre", type = "point")
-play.df
-```
-
-    ## # A tibble: 1,614 x 3
-    ##    object_id longitude latitude
-    ##    <fct>         <dbl>    <dbl>
-    ##  1 1             -77.2     38.9
-    ##  2 2             -77.1     39.0
-    ##  3 3             -77.0     38.9
-    ##  4 4             -77.1     39.0
-    ##  5 5             -77.1     38.9
-    ##  6 6             -77.4     39.0
-    ##  7 7             -77.3     38.8
-    ##  8 8             -77.1     38.8
-    ##  9 9             -77.3     38.8
-    ## 10 10            -77.1     38.8
-    ## # … with 1,604 more rows
-
-``` r
-playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centres")  
+playground.gg <- osm_point_plot(ff.map, play.df, "Sports Centers")  
 playground.gg  
 ```
 
@@ -396,10 +294,110 @@ playground.gg
 
     ## Warning: Removed 2 rows containing missing values (geom_point).
 
-<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-5-2.png" width="90%" />
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-5-1.png" width="90%" />
 
 ``` r
 play.df$object_id %>% unique() %>% length()
 ```
 
     ## [1] 1614
+
+Use:
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "nature_reserve", type = "polygon")
+playground.gg <- osm_poly_plot(ff.map, play.df, "Nature Reserves")  
+playground.gg  
+```
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-6-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 213
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "boundary", value = "national_park", type = "polygon")
+playground.gg <- osm_poly_plot(ff.map, play.df, "National Parks")  
+playground.gg  
+```
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-7-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 75
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "dog_park", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Dog Parks")  
+playground.gg  
+```
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-8-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 298
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "garden", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Gardens")  
+playground.gg  
+```
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-9-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 1717
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "track", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Tracks")  
+playground.gg  
+```
+
+    ## Warning: Removed 13 rows containing non-finite values (stat_density2d).
+
+    ## Warning: Removed 13 rows containing missing values (geom_point).
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 4803
+
+Track Obs:
+
+``` r
+ff.map <- fairfax.gg()
+play.df <- osm_to_df(key = "leisure", value = "fitness_station", type = "point")
+playground.gg <- osm_point_plot(ff.map, play.df, "Fitness Stations")  
+playground.gg  
+```
+
+<img src="physical_mapping_files/figure-markdown_github/unnamed-chunk-11-1.png" width="90%" />
+
+``` r
+play.df$object_id %>% unique() %>% length()
+```
+
+    ## [1] 34
+
+Fitess Station Observations: Represent outdoor public fitness equipment; not enough points! Use: No
