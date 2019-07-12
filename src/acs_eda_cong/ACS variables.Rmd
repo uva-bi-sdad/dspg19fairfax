@@ -1,0 +1,172 @@
+---
+title: "ACS variables exploration example"
+author: "Cong Cong"
+date: "7/1/2019"
+output:
+  github_document: default
+  html_document: default
+---
+  
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Installation Libraries if needed
+
+#Libraries
+library(tidyverse)
+library(janitor) #Also needs library(snakecase) as dependencies
+library(viridis)
+library(purrr)
+library(stringr)
+library(ggplot2)
+
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+  #  fig.height =   
+  fig.width = 6,
+  #  fig.asp = .5,
+  out.width = "90%",
+  #  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#1. Example Read and Explore Age data
+
+```{r message = FALSE}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+```{r warning = FALSE, message = FALSE}
+#1. Data Description  
+# Select the variables about age
+acs.age.df <- acs.df %>% select("id_type","id",starts_with("age")) 
+
+#Dimension
+age.dim  <- acs.age.df %>% select(ends_with("est")) %>% dim()
+
+#Age groups
+age.vars <- str_extract(names(acs.age.df), "(?<=age).*(?=_est)") %>% 
+  na.omit() %>% 
+  unique() %>%
+  gsub("_","-",.)
+
+#Missing data
+miss.df <- tibble(
+  Variable = names(acs.age.df),
+  Count = acs.age.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.age.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+The age data contain `r age.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district.
+There are `r length(age.vars)`age groups: `r age.vars`. In each age group, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+
+#2.Descriptive statistics at highschool district level
+
+```{r}
+#Proportion by district
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+acs.age.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+acs.age.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+These tables show the proportation of each age group in each type of district. For economic vulnerability analysis, we care about the proportion of people aged under 16/18 and above 65: 
+
+```{r}
+acs.age.df %>% filter(id_type=="census_tract") %>%  find_pct() %>%
+  transmute(id,id_type,
+            age0_18_pct = age0_5_pct + age5_9_pct + age10_14_pct + age15_17_pct,
+            age65up_pct) %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+
+acs.age.df %>% filter(id_type=="highschool_district") %>%  find_pct() %>%
+  transmute(id,id_type,
+            age0_18_pct = age0_5_pct + age5_9_pct + age10_14_pct + age15_17_pct,
+            age65up_pct) %>% knitr::kable() 
+  
+```
+
+From the opportunity census tracts, people under 18 years old compose 20-30 percent of the population, people above 65 years old below 20 percent. Census tract 4215 has the largest proportion of minor population while Census tract 4515.02 has the largest proportion of elderly people. 
+
+```{r}
+# Visualize the distribution by census tracts
+age.pct <- acs.age.df %>%
+  filter(id_type=="census_tract") %>% 
+  find_pct() %>% 
+  select(-SUM) %>% 
+  gather(key = variable, value = value, -c(id, id_type))
+
+ggplot(data=age.pct, aes(x=variable, y=value, group=id)) +
+  geom_line() +
+  geom_point() +
+  labs(title="Age distribution by census tracts",x="Age Groups", y = "Percentage (%)") +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+```
+This map visualizes the distribution of age groups and the range of proportion in all districts. People of the age 25 to 44 take the largest proportion in most of the census tracts.
+
+```{r}
+# Visualize the distribution by school districts
+age.pct <- acs.age.df %>%
+  filter(id_type=="highschool_district") %>% 
+  find_pct() %>% 
+  select(-SUM) %>% 
+  gather(key = variable, value = value, -c(id, id_type))
+
+ggplot(data=age.pct, aes(x=variable, y=value, group=id)) +
+  geom_line() +
+  geom_point() +
+  labs(title="Age distribution by highschool districts",x="Age Groups", y = "Percentage (%)") +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+```
+There is more variance in terms of the largest age group among all the highschool districts. 
+
+```{r}
+#Sum of population in each age group across all districts
+sum_plot <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  plot <- dt %>% select_if(is.numeric)%>% colSums(.)%>% as.data.frame()
+  colnames(plot) <- "count"
+  ggplot(data=plot, aes(x=rownames(plot), y=count)) + 
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Age distribution in ", unique(dt$id_type)),
+         x="Age Groups", y = "Percentage (%)") 
+}
+
+acs.age.df %>% filter(id_type=="census_tract") %>% sum_plot()
+acs.age.df %>% filter(id_type=="highschool_district") %>% sum_plot()
+```
+Overall people of the age 25 to 34 is the largest population in all studied census tracts. People of the age 45 to 54 is the largest population in all high school districts.
+
+
