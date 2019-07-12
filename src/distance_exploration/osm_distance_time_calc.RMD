@@ -40,3 +40,11 @@ theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.posi
 #Set Scientific notation output for knitr
 options(scipen = 999999)
 ```
+
+
+#1. Read OSM Final Data
+
+```{r}
+osm.df <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv")
+
+```
