@@ -1,0 +1,1162 @@
+---
+title: "ACS Variable Exploration"
+author: "Eliza"
+date: "7/2/2019"
+output: 
+  github_document: default
+  html_document: default
+---
+
+
+#Load Packages & Set Theme
+```{r setup, message = FALSE, warning = FALSE}
+#Install libraries if needed
+
+#Libraries
+library(tidyverse)
+library(janitor) #Also needs library(snakecase) as dependencies
+library(viridis)
+library(purrr)
+library(stringr)
+library(knitr)
+
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+  #  fig.height =   
+  fig.width = 6,
+  #  fig.asp = .5,
+  out.width = "90%",
+  #  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#Read in Data
+```{r, message = FALSE, warning = FALSE}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+#Variable Exploration
+
+_____________________
+
+###Variables Explored:
+###1. Unemployment Rate
+###2. Ethnicity
+###3. Race
+###4. Marital Status
+###5. Single Parent Household
+###6. English Speaking Ability
+###7. Education
+_____________________
+
+##1. Unemployment Rate
+
+###A. Data Description
+```{r}
+# Select the variables about employment
+acs.employment.df <- acs.df %>% select("id_type","id",contains("employed")) 
+
+#Dimension
+employment.dim  <- acs.employment.df %>% select(ends_with("est")) %>% dim()
+
+#Employment Groups
+##employment.vars <- str_extract(names(acs.employment.df), "(?<=age).*(?=_est)") %>% 
+  ##na.omit() %>% 
+  ##unique() %>%
+  ##gsub("_","-",.)
+
+#Missing data
+miss.employment.df <- tibble(
+  Variable = names(acs.employment.df),
+  Count = acs.employment.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.employment.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+*Description:* The employment data contains `r employment.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are two employment groups: unemployed and employed. Because there are only two, it is not necessary to group these data. In both employment groups, the observation includes an estimated value and a margin of error value. There is no missing value in this dataset.
+
+###B. Proportionality
+
+*Description:* Each of these tables displays the percentage of individuals employed versus unemployed across various census tracts, high school districts, and supervisor districts.
+
+*###i. Census Tract*
+```{r, warning = FALSE}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.employment.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+acs.employment.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+acs.employment.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode
+
+*###i. Percent Unemployed by Census Tract*
+```{r}
+acs.employment.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_employment_census <-acs.employment.df %>% filter(id_type == "census_tract") %>%
+   find_pct() 
+dt_employment_census$id<-str_extract(dt_employment_census$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=dt_employment_census, aes(id, unemployed_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Unemployment Rate by ", unique(dt_employment_census$id_type)),
+         x="Census Tract", y = "Unemployment Rate (%)") 
+```
+
+*###ii. Percent Unemployed by High School District*
+```{r}
+acs.employment.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_employment_hs <-acs.employment.df %>% filter(id_type == "highschool_district") %>%
+  find_pct() 
+  ggplot(data=dt_employment_hs, aes(id, unemployed_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Unemployment Rate by ", unique(dt_employment_hs$id_type)),
+         x="High School District", y = "Unemployment Rate (%)") 
+```
+
+*###iii. Percent Unemployed by Supervisor District*
+```{r}
+acs.employment.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_employment_sv <-acs.employment.df %>% filter(id_type == "supervisor_district") %>%
+  find_pct() 
+  ggplot(data=dt_employment_sv, aes(id, unemployed_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Unemployment Rates by ", unique(dt_employment_sv$id_type)),
+         x="Supervisor District", y = "Unemployment Rate (%)") 
+```
+
+##2. Ethnicity
+
+###A. Data Description
+```{r}
+# Select the variables about ethnicity
+acs.ethnicity.df <- acs.df %>% select("id_type","id",contains("hispanic")) 
+
+#Dimension
+ethnicity.dim  <- acs.ethnicity.df %>% select(ends_with("est")) %>% dim()
+
+#Ethnicity Groups
+##ethnicity.vars <- str_extract(names(acs.ethnicity.df), "(?<=hispanic).*(?=_est)") %>% 
+  ##na.omit() %>% 
+  ##unique() %>%
+  ##gsub("_","-",.)
+
+#Missing data
+miss.ethnicity.df <- tibble(
+  Variable = names(acs.ethnicity.df),
+  Count = acs.ethnicity.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.ethnicity.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+*Description:* The ethnicity data contains `r ethnicity.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are two ethnicity groups: identifying as Hispanic or Latino. Because there are only two, it is not necessary to group these data. In both ethnicity identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the percent of individuals identifying or not identifying as Hispanic or Latino across various census tracts, high school districts, and supervisor districts.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.ethnicity.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+acs.ethnicity.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+acs.ethnicity.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode
+
+*###i. Proportion of Population Identifying as Hispanic or Latino by Census Tract*
+```{r}
+acs.ethnicity.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_ethnicity_census <-acs.ethnicity.df %>% filter(id_type == "census_tract") %>%
+  find_pct() 
+dt_ethnicity_census$id<-str_extract(dt_ethnicity_census$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=dt_ethnicity_census, aes(id, hispanic_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proportion of Population Hispanic or Latino by ", unique(dt_ethnicity_census$id_type)),
+         x="Census Tract", y = "Percentage Hispanic or Latino") 
+```
+
+*###ii. Proportion of Population Identifying as Hispanic or Latino by High School District*
+```{r}
+acs.ethnicity.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_ethnicity_hs <-acs.ethnicity.df %>% filter(id_type == "highschool_district") %>%
+  find_pct() 
+  ggplot(data=dt_ethnicity_hs, aes(id, hispanic_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proportion of Population Hispanic or Latino by ", unique(dt_ethnicity_hs$id_type)),
+         x="High School District", y = "Percentage Hispanic or Latino") 
+```
+
+*###iii. Proportion of Population Identifying as Hispanic or Latino by Supervisor District*
+```{r}
+acs.ethnicity.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_ethnicity_sd <-acs.ethnicity.df %>% filter(id_type == "supervisor_district") %>%
+  find_pct()
+  ggplot(data=dt_ethnicity_sd, aes(id, hispanic_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proportion of Population Hispanic or Latino by ", unique(dt_ethnicity_sd$id_type)),
+         x="Supervisor District", y = "Percentage Hispanic or Latino") 
+```
+
+
+##3. Race
+
+###A. Data Description
+```{r}
+# Select the variables about race
+acs.race.df <- acs.df %>% select("id_type","id", one_of("white_est", "black_est", "asian_est", "other_est_y")) 
+
+#Dimension
+race.dim  <- acs.race.df %>% select(ends_with("est")) %>% dim()
+
+#Race Groups
+##race.vars <- str_extract(names(acs.race.df), "(?<=race).*(?=_est)") %>% 
+##na.omit() %>% 
+##unique() %>%
+##gsub("_","-",.)
+
+#Missing data
+miss.race.df <- tibble(
+  Variable = names(acs.race.df),
+  Count = acs.race.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.race.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+*Description:* The race data contains `r race.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are four race variables: white, black, asian, and other. Because there are only four variables, and these variables share no common grouping pattern, the race groups function is unnecessary. In all of the race identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the proportion of individuals identifying as white, black, asian, or other by census tracts, high school districts, and supervisor districts. The second table under each roman numeral shows the distribution of white versus minority (black, asian, or other) populations in each respective geography. This more general comparison is relevant to our exploration of vulnerable populations.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.race.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Create new Variable & Examine White versus Minority by Census Tract*
+```{r}
+#Collapse black, asian, and other variables into "minority" variable
+acs.collapsedrace <- acs.race.df
+acs.collapsedrace$minority <- acs.collapsedrace$black_est+acs.collapsedrace$asian_est+acs.collapsedrace$other_est_y
+acs.collapsedrace<-acs.collapsedrace[,-c(4:6)]
+
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedrace %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.race.df %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###White versus Minority by High School District*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+acs.collapsedrace %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.race.df %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###White versus Minority by High School District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedrace %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode 
+
+*###i. Proportion of Population Minority Versus White by Census Tract* 
+```{r}
+#create new variable to filter for desired geography without disturbing original acs.collapsedrace
+census.collapsedrace <- acs.collapsedrace
+census.collapsedrace <- census.collapsedrace %>% filter(id_type=="census_tract") %>%
+  find_pct()
+#make tidy data frame in order to examine data in a grouped bar plot
+acs.race.tidy.df <- census.collapsedrace %>% gather(key = race, value = value,-c(id,id_type,SUM))
+acs.race.tidy.df$id<-str_extract(acs.race.tidy.df$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=acs.race.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = race),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("White Versus Minority Population by ", unique(acs.race.tidy.df$id_type)),
+         x="Census Tract", y = "Percentage") 
+```
+
+*###ii. Proportion of Population Minority Versus White by High School District*
+```{r}
+hs.collapsedrace <- acs.collapsedrace
+hs.collapsedrace <- hs.collapsedrace %>% filter(id_type == "highschool_district") %>%
+  find_pct()
+acs.race.tidy.df <- hs.collapsedrace %>% gather(key = race, value = value,-c(id, id_type, SUM))
+  ggplot(data=acs.race.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = race),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("White Versus Minority Population by ", unique(acs.race.tidy.df$id_type)),
+         x="High School District", y = "Percentage") 
+```
+
+*###iii. Proportion of Population Minority Versus White by Supervisor District*
+```{r}
+sv.collapsedrace <- acs.collapsedrace
+sv.collapsedrace <- sv.collapsedrace %>% filter(id_type=="supervisor_district") %>%
+  find_pct()
+acs.race.tidy.df <- sv.collapsedrace %>% gather(key = race, value = value,-c(id,id_type,SUM))
+  ggplot(data=acs.race.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = race),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("White Versus Minority Population by ", unique(acs.race.tidy.df$id_type)),
+         x="Supervisor District", y = "Percentage") 
+```
+
+##4. Marital Status
+
+###A. Data Description
+```{r}
+# Select the variables about marital status
+acs.marriage.df <- acs.df %>% select("id_type","id", contains("married"), -starts_with("family"))
+
+#Dimension
+marriage.dim  <- acs.marriage.df %>% select(ends_with("est")) %>% dim()
+
+#Marriage Groups
+##marriage.vars <- str_extract(names(acs.marriage.df), "(?<=married).*(?=_est)") %>% 
+  ##na.omit() %>% 
+  ##unique() %>%
+  ##gsub("_","-",.)
+
+#Missing data
+miss.marriage.df <- tibble(
+  Variable = names(acs.marriage.df),
+  Count = acs.marriage.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.marriage.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+*Description:* The marriage data contains `r marriage.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are two marriage variables: married and unmarried. Because there are only two variables, grouping is unnecessary. In both marriage identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the percent of individuals married and not married across various census tracts, high school districts, and supervisor districts.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.marriage.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+acs.marriage.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+acs.marriage.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode
+
+*###i. Proportion Unmarried by Census Tract*
+```{r}
+acs.marriage.df %>% filter(id_type=="census_tract") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_marriage_census <-acs.marriage.df %>% filter(id_type == "census_tract") %>%
+   find_pct() 
+dt_marriage_census$id<-str_extract(dt_marriage_census$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=dt_marriage_census, aes(id, unmarried_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Percent Unmarried by ", unique(dt_marriage_census$id_type)),
+         x="Census Tract", y = "Percent Unmarried") 
+```
+
+*###ii. Proportion of Population Unmarried by High School District*
+```{r}
+acs.marriage.df %>% filter(id_type=="highschool_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_marriage_hs <- acs.marriage.df %>% filter(id_type == "highschool_district") %>%
+  find_pct() 
+  ggplot(data = dt_marriage_hs, aes(id, unmarried_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Percent Unmarried by ", unique(dt_marriage_hs$id_type)),
+         x="High School District", y = "Percent Unmarried") 
+```
+
+*###iii. Proportion of Population Unmarried by Supervisor District*
+```{r}
+acs.marriage.df %>% filter(id_type=="supervisor_district") %>%
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+dt_marriage_sv <-acs.marriage.df %>% filter(id_type == "supervisor_district") %>%
+  find_pct() 
+  ggplot(data=dt_marriage_sv, aes(id, unmarried_pct)) +  
+    geom_bar(stat="identity") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Percent Unmarried by ", unique(dt_marriage_sv$id_type)),
+         x="Supervisor District", y = "Percent Unmarried") 
+```
+
+##5. Single Parent Household (Family Household Type)
+
+###A. Data Description
+```{r}
+# Select the variables about single parent household
+acs.family.df <- acs.df %>% select("id_type","id", contains("family"))
+
+#Dimension
+family.dim  <- acs.family.df %>% select(ends_with("est")) %>% dim()
+
+#Family Groups
+##marriage.vars <- str_extract(names(acs.marriage.df), "(?<=married).*(?=_est)") %>% 
+  ##na.omit() %>% 
+  ##unique() %>%
+  ##gsub("_","-",.)
+
+#Missing data
+miss.family.df <- tibble(
+  Variable = names(acs.family.df),
+  Count = acs.family.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.family.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+*Description:* The household family data contains `r family.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are three household family groups: married-couple family households, other family households (single parent households), and nonfamily households. Because there are only three groups, it is not necessary to group these data. In all three family identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the proportion of married-couple family households, other family households (single parent households), and nonfamily households in each census tract, high school district, and supervisor district, respectively. Additionally, the second chart under each roman numeral shows single parent households versus family and non-family households ("other households"), as this comparison is relevant to our analysis of vulnerable populations in Fairfax County.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.family.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Create New Variable and Examine Single Parent v. Other Households*
+```{r}
+#Collapse "married family" and "non family" variables into "other households" variable
+acs.collapsedfamily <- acs.family.df
+acs.collapsedfamily$other_households <- acs.collapsedfamily$family_married_est+acs.collapsedfamily$nonfamily_est
+
+acs.collapsedfamily <-acs.collapsedfamily[,-c(3:4, 6:8)]
+
+#Proportion by Census Tract
+find_pct <- function(dt){
+  #dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedfamily %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.family.df %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Single Parent v. Other Households by High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  #dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedfamily %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.family.df %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Single Parent v. Other Households by Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  #dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedfamily %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode
+
+*###i. Proportion Single Parent Household by Census Tract*
+```{r}
+census.collapsedfamily <- acs.collapsedfamily
+census.collapsedfamily <- census.collapsedfamily %>% filter(id_type=="census_tract") %>%
+  find_pct()
+acs.family.tidy.df <- census.collapsedfamily %>% gather(key = household, value = value,-c(id, id_type, SUM))
+acs.family.tidy.df$id<-str_extract(acs.family.tidy.df$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=acs.family.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = household),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Single Parent Household Versus Other Households by ", unique(acs.family.tidy.df$id_type)),
+         x="Census Tract", y = "Percentage") 
+```
+
+*###ii. Proportion Single Parent Household by High School District*
+```{r}
+hs.collapsedfamily <- acs.collapsedfamily
+hs.collapsedfamily <- hs.collapsedfamily %>% filter(id_type == "highschool_district") %>%
+  find_pct()
+acs.family.tidy.df <- hs.collapsedfamily %>% gather(key = household, value = value,-c(id, id_type, SUM))
+  ggplot(data=acs.family.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = household),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Single Parent Households Versus Other Households by ", unique(acs.family.tidy.df$id_type)),
+         x="High School District", y = "Percentage") 
+```
+
+*###iii. Proportion Single Parent Household by Supervisor District*
+```{r}
+sv.collapsedfamily <- acs.collapsedfamily
+sv.collapsedfamily <- sv.collapsedfamily %>% filter(id_type=="supervisor_district") %>%
+  find_pct()
+acs.family.tidy.df <- sv.collapsedfamily %>% gather(key = household, value = value,-c(id,id_type,SUM))
+  ggplot(data=acs.family.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = household), stat="identity", position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Single Parent Households Versus Other Households by ", unique(acs.family.tidy.df$id_type)),
+         x="Supervisor District", y = "Percentage") 
+```
+
+##6. English Speaking Ability
+
+###A. Data Description
+```{r}
+# Select the variables about ability to speak english
+acs.language.df <- acs.df %>% select("id_type","id", one_of("very_well_est", "well_est", "not_well_est", "not_at_all_est"))
+
+#Dimension
+language.dim  <- acs.language.df %>% select(ends_with("est")) %>% dim()
+
+#Family Groups
+##marriage.vars <- str_extract(names(acs.marriage.df), "(?<=married).*(?=_est)") %>% 
+  ##na.omit() %>% 
+  ##unique() %>%
+  ##gsub("_","-",.)
+
+#Missing data
+miss.language.df <- tibble(
+  Variable = names(acs.language.df),
+  Count = acs.language.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.language.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+*Description:* The language data contains `r language.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. Individuals identified their english speaking skills according to four variables: very well, well, not well, and not at all. Because there are only four variables, it is not necessary to group these data. In all four language identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the proportion of individuals who identified their english speaking abilities as very well, well, not well, and not at all at various geographies. Additionally, the second chart under each roman numeral shows the distribution of proficient english speakers (those who speak english very well and well) versus limited english speakers (those who speak english not well and not at all). This comparison is relevant to our analysis of vulnerable populations in Fairfax County.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.language.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Create New Variable and Examine Proficient v. Limited English Ability by Census Tract*
+```{r}
+#Collapse "well" and "very well" language variables into "proficient" variable
+acs.collapsedlanguage <- acs.language.df
+acs.collapsedlanguage$proficient <- acs.collapsedlanguage$well_est+acs.collapsedlanguage$very_well_est
+
+#Collapse "not well" and "not at all" variables into "limited" variable
+acs.collapsedlanguage$limited <- acs.collapsedlanguage$not_well_est+acs.collapsedlanguage$not_at_all_est
+
+acs.collapsedlanguage <-acs.collapsedlanguage[,-c(3:6)]
+
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedlanguage %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.language.df %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Examine Proficient v. Limited English Ability by High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedlanguage %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.language.df %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Examine Proficient v. Limited English Ability by Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsedlanguage %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode 
+
+*###i. Proportion of Census Tract Population with Limited v. Proficient English Ability* 
+```{r}
+census.collapsedlanguage <- acs.collapsedlanguage
+census.collapsedlanguage <- census.collapsedlanguage %>% filter(id_type=="census_tract") %>%
+  find_pct()
+acs.language.tidy.df <- census.collapsedlanguage %>% gather(key = english, value = value,-c(id, id_type, SUM))
+acs.language.tidy.df$id<-str_extract(acs.language.tidy.df$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=acs.language.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = english),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proficient versus Limited English Ability by ", unique(acs.language.tidy.df$id_type)),
+         x="Census Tract", y = "Percentage") 
+```
+
+*###ii. Proportion of Population Minority Versus White Population by High School District*
+```{r}
+hs.collapsedlanguage <- acs.collapsedlanguage
+hs.collapsedlanguage <- hs.collapsedlanguage %>% filter(id_type == "highschool_district") %>%
+  find_pct()
+acs.language.tidy.df <- hs.collapsedlanguage %>% gather(key = english, value = value,-c(id, id_type, SUM))
+  ggplot(data=acs.language.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = english),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proficient versus Limited English Ability by ", unique(acs.language.tidy.df$id_type)),
+         x="High School District", y = "Percentage") 
+```
+
+*###iii. Proportion of Population Minority Versus White Population by Supervisor District*
+```{r}
+sv.collapsedlanguage <- acs.collapsedlanguage
+sv.collapsedlanguage <- sv.collapsedlanguage %>% filter(id_type=="supervisor_district") %>%
+  find_pct()
+acs.language.tidy.df <- sv.collapsedlanguage %>% gather(key = english, value = value,-c(id,id_type,SUM))
+  ggplot(data=acs.language.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = english),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Proficient versus Limited English Ability by ", unique(acs.language.tidy.df$id_type)),
+         x="Supervisor District", y = "Percentage") 
+```
+
+##7. Education 
+
+###A. Data Description
+```{r}
+# Select the variables about education
+acs.education.df <- acs.df %>% select("id_type","id", one_of("less_highschool_est", "highschool_ged_est", "bachelors_est", "masters_est", "professional_school_est", "doctorate_est"))
+
+#Dimension
+education.dim  <- acs.education.df %>% select(ends_with("est")) %>% dim()
+
+##Education Groups -- no pattern
+##education.vars <- str_extract(names(acs.education.df), "*(?=_est)") %>% 
+ ## na.omit() %>% 
+ ## unique() %>%
+ ## gsub("_","-",.)
+
+#Missing data
+miss.education.df <- tibble(
+  Variable = names(acs.education.df),
+  Count = acs.education.df %>% map_dbl(.x = ., ~is.na(.x) %>% sum()),
+  Percentage = acs.education.df %>% map_dbl(.x = ., ~is.na(.x) %>% mean())) %>%
+  mutate(
+    Percentage = as.character(Percentage * 100) %>% str_c(., "%")
+  )
+```
+
+
+*Description:* The education data contains `r education.dim[1]` observations aggregated by four geographic units: blockgroup, census tract, highschool district, and supervisor district. There are six education groups: less_highschool (earned less than a high school diploma), highschool_ged (earned a GED or a high school diploma), bachelors, masters, professional_school, and doctorate. Because there are only six groups, it is not necessary to group these data. In all six education identifiers, the observation includes an estimated value and a value of margin of error. There is no missing value in this dataset.
+
+###B. Proportionality 
+
+*Description:* Each of these tables displays the percent distribution of individuals in each of the previously identified education groups. Additionally the second chart under each roman numeral shows the distribution of those who without a high school diploma versus those with a high school diploma or GED and above. This comparison is relevant to our analysis of vulnerable populations in Fairfax County.
+
+*###i. Census Tract*
+```{r}
+#Proportion by Census Tract
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.education.df %>% filter(id_type == "census_tract") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Create New Variable and Examine Less Education versus More Education by Census Tract*
+```{r}
+#Collapse all groups of individuals who earned high school diploma/GED and above
+acs.collapsededucation <- acs.education.df
+acs.collapsededucation$more_highschool <- acs.collapsededucation$highschool_ged_est+ acs.collapsededucation$bachelors_est + acs.collapsededucation$masters_est + acs.collapsededucation$professional_school_est + acs.collapsededucation$doctorate_est
+
+
+acs.collapsededucation <-acs.collapsededucation[,-c(4:8)]
+
+#Proportion by High School District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsededucation %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###ii. High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.education.df %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Less Education versus More Education by High School District*
+```{r}
+#Proportion by High School District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsededucation %>% filter(id_type == "highschool_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###iii. Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.education.df %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+*###Less Education versus More Education by Supervisor District*
+```{r}
+#Proportion by Supervisor District
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+acs.collapsededucation %>% filter(id_type == "supervisor_district") %>% 
+  find_pct() %>%
+  mutate_if(is.numeric, funs(as.character() %>% str_c(., "%"))) %>%
+  knitr::kable() 
+```
+
+###C. Recode 
+
+*###i. Proportion of Census Tract Population with Less than High School v More than High School Education* 
+```{r}
+census.collapsededucation <- acs.collapsededucation
+census.collapsededucation <- census.collapsededucation %>% filter(id_type=="census_tract") %>%
+  find_pct()
+acs.education.tidy.df <- census.collapsededucation %>% gather(key = education, value = value,-c(id,id_type,SUM))
+acs.education.tidy.df$id<-str_extract(acs.education.tidy.df$id, "(?<=Census Tract ).*(?=, Fairfax County, Virginia)")
+  ggplot(data=acs.education.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = education),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Education Level by ", unique(acs.education.tidy.df$id_type)),
+         x="Census Tract", y = "Percentage") 
+```
+
+*###ii. Proportion of Population with Less than High School v More than High School Education by High School District*
+```{r}
+hs.collapsededucation <- acs.collapsededucation
+hs.collapsededucation <- hs.collapsededucation %>% filter(id_type == "highschool_district") %>%
+  find_pct()
+acs.education.tidy.df <- hs.collapsededucation %>% gather(key = education, value = value,-c(id, id_type, SUM))
+  ggplot(data=acs.education.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = education),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Education Level by ", unique(acs.education.tidy.df$id_type)),
+         x="High School District", y = "Percentage") 
+```
+
+*###iii. Proportion of Population Minority Versus White Population by Supervisor District*
+```{r}
+sv.collapsededucation <- acs.collapsededucation
+sv.collapsededucation <- sv.collapsededucation %>% filter(id_type=="supervisor_district") %>%
+  find_pct()
+acs.education.tidy.df <- sv.collapsededucation %>% gather(key = education, value = value,-c(id,id_type,SUM))
+  ggplot(data=acs.education.tidy.df, aes(id, value)) +  
+    geom_bar(aes(fill = education),stat="identity",position="dodge") + 
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title=paste0("Education Level by ", unique(acs.education.tidy.df$id_type)),
+         x="Supervisor District", y = "Percentage") 
+```

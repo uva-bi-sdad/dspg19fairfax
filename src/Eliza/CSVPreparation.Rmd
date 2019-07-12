@@ -1,0 +1,193 @@
+---
+title: "CSV Merging"
+author: "Eliza"
+date: "7/10/2019"
+output: html_document
+---
+
+#Load Packages & Set Theme
+```{r setup, message = FALSE, warning = FALSE}
+#Install libraries if needed
+
+#Libraries
+library(tidyverse)
+library(janitor) #Also needs library(snakecase) as dependencies
+library(viridis)
+library(purrr)
+library(stringr)
+library(knitr)
+
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+  #  fig.height =   
+  fig.width = 6,
+  #  fig.asp = .5,
+  out.width = "90%",
+  #  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+#Read in Data
+```{r, message = FALSE, warning = FALSE}
+#Read in the ACS wide and ACS long (tidy) data
+acs.df <- read_csv("/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
+#acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
+```
+
+##1. Unemployment 
+```{r, warning = FALSE}
+# Select the variables about employment
+acs.employment.df <- acs.df %>% select("id_type","id",contains("employed")) 
+
+#define function
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+#Filter
+employment.filter.df <- acs.employment.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id,id_type,unemployed_pct)
+  
+```
+
+##2. Ethnicity
+```{r, warning = FALSE}
+# Select the variables about ethnicity
+acs.ethnicity.df <- acs.df %>% select("id_type","id",contains("hispanic"))
+
+#Filter
+ethnicity.filter.df <- acs.ethnicity.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id,id_type,hispanic_pct)
+  
+```
+##3. Race
+```{r, warning = FALSE}
+# Select the variables about race
+acs.race.df <- acs.df %>% select("id_type","id", one_of("white_est", "black_est", "asian_est", "other_est_y")) 
+#create desired new variable
+acs.race.df$minority_est <- acs.race.df$black_est+acs.race.df$asian_est+acs.race.df$other_est_y
+acs.race.df<-acs.race.df[,-c(4:6)]
+
+
+#change format
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+#Filter
+race.filter.df <- acs.race.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id, id_type, minority_pct) 
+  
+```
+##4. Marital Status
+```{r, warning = FALSE}
+# Select the variables about marriage
+acs.marriage.df <- acs.df %>% select("id_type","id", contains("married"), -starts_with("family"))
+
+#Filter
+marriage.filter.df <- acs.marriage.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id,id_type,unmarried_pct)
+  
+```
+##5. Single Parent Household
+```{r, warning = FALSE}
+# Select the variables about race
+acs.family.df <- acs.df %>% select("id_type","id", contains("family"))
+
+#change format
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+#Filter
+family.filter.df <- acs.family.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id, id_type, family_singleparent_pct) 
+  
+```
+##6. English Speaking Ability
+```{r, warning = FALSE}
+# Select the variables about language
+acs.language.df <- acs.df %>% select("id_type","id", one_of("very_well_est", "well_est", "not_well_est", "not_at_all_est"))
+#create desired "limited language ability" variable (combo of not well and not at all) and "proficient" variable (combo of very well and well)
+acs.language.df$limited_ability <- acs.language.df$not_well_est+acs.language.df$not_at_all_est
+acs.language.df$proficient <- acs.language.df$well_est+acs.language.df$very_well_est
+
+acs.language.df <-acs.language.df[,-c(3:6)]
+#Change format
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+#Filter
+language.filter.df <- acs.language.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id, id_type, limited_ability) 
+  
+```
+##7. Education
+```{r, warning = FALSE}
+# Select the variables about education
+acs.education.df <- acs.df %>% select("id_type","id", one_of("less_highschool_est", "highschool_ged_est", "bachelors_est", "masters_est", "professional_school_est", "doctorate_est"))
+
+#Change format
+find_pct <- function(dt){
+  # only one id_type
+  ##dt <- dt[, -grep("moe",colnames(dt))]
+  dt$SUM = rowSums( dt[ sapply(dt, is.numeric)] )
+  dt.pct <- dt %>% 
+    mutate_if(is.numeric, funs(round(.*100/SUM,2)))
+  colnames(dt.pct) <- gsub("est","pct",colnames(dt.pct))
+  dt.pct
+}
+
+#Filter
+education.filter.df <- acs.education.df %>% filter(!id_type == "blockgroup") %>%
+  find_pct() %>%
+  select(id, id_type, less_highschool_pct) 
+  
+```
+
+#Merge Data
+```{r}
+master_dataset_eliza = Reduce(function(x, y) merge(x, y, all=TRUE),list(employment.filter.df, ethnicity.filter.df, race.filter.df, marriage.filter.df, family.filter.df, language.filter.df, education.filter.df))
+
+#write.csv(master_dataset_eliza, "./data/working/master_dataset_eliza.csv")
+
+```
