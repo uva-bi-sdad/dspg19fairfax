@@ -42,9 +42,99 @@ options(scipen = 999999)
 ```
 
 
-#1. Read OSM Final Data
+##1. Read OSM Final Data  
+
+####a. Introduction
 
 ```{r}
-osm.df <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv")
+osm.df    <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv")
+osm.dim   <- dim(osm.df)
+osm.names <- names(osm.df) %>% paste0(., collapse = ", ")
+
+```
+
+The dimensions of the raw data are `r osm.dim %>% paste0(., ", ")` and the variables contained are named `r osm.names`. 
+
+####b. Sample Park Boundary  
+
+Reading in the final osm data. Need to reduce the number of points to look through for the park polygons. Using centroids is definitely going to bias the distance-time coverage downward. Further, we are interested in whether they are close to the boundary. However, we don't need to look through every point. Instead we take a random sample of boundary points for each polygon and use those instead. 
+
+This is a simplification for computational efficiency, but with random sampling, the only error should really be random. From a uniform distribution, we should get a relatively good sample of the boundary points to calculate distance_time. 
+
+```{r, warning = FALSE, message = FALSE}
+#Investigating the Number of Points in each Park Boundary
+park.df <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
+  nest(-c(environment, variable)) %>%
+  filter(variable == "Park") %>%
+  dplyr::select(data) %>%
+  unnest() %>%
+  nest(-object_id) %>%
+  mutate(
+    length = map_dbl(data, nrow)
+  ) 
+#Check out length of Parks
+park.df$length %>% summary()
+
+#Distribution
+park.df %>%
+  ggplot(aes(x = length)) +
+  geom_histogram(fill = "purple", colour = "black") +
+  labs(
+    x = "Length of Polygon Boundary",
+    y = "Count",
+    title = "Distribution of Park Boundary Length"
+  )
+```
+
+
+As the variability in length (analogous to the size of park) is quite high, quite a few small parks and quite a few extremely large parks. As such we will take a random sample that is proportionate to the size of the park. To do say we say we will sample 25% of the boundary points at random.   
+
+
+```{r warning = FALSE, message = FALSE}
+#Mutating/sampling the spatial data by park object_id
+park.df <- park.df %>%
+  mutate(
+    data = map(.x = data, 
+               ~ slice(.x, sample(1:nrow(.x), (nrow(.x)/2) %>%ceiling(), replace = FALSE))
+               ),
+    length_new = map_dbl(data, nrow)
+  )
+
+#Check out new length of Parks
+park.df$length_new %>% summary()
+
+#Distribution
+park.df %>%
+  ggplot(aes(x = length_new)) +
+  geom_histogram(fill = "purple", colour = "black") +
+  labs(
+    x = "Length of Polygon Boundary",
+    y = "Count",
+    title = "Distribution of Park Boundary Length"
+  )
+
+```
+
+
+####c. Replace PArk Data in OSM Final Data  
+
+```{r}
+osm.df <- osm.df %>%
+  nest(-c(environment, variable)) %>%
+  mutate(
+    data = ifelse(variable == "Park", 
+                  park.df %>%
+                  dplyr::select(object_id, data) %>%
+                  unnest(),
+                  data),
+    data = map(data, as_tibble)
+  )
+
+
+
+osm.df <- osm.df %>%
+  unnest()
+
+
 
 ```
