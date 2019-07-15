@@ -1,0 +1,133 @@
+---
+title: "OSM Time-Distance Mutation"
+author: "DSPG Business Innovation Team"
+date: "7/15/2019"
+output: 
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Load Pacman for multiple package loads
+if (!require("pacman")) install.packages(pacman)
+
+#Need most updated dplyr if haven't already done this
+#install.packages("dplyr") #need updated dplyr for sf objects
+
+#Load all the good stuff
+pacman::p_load(tidyverse, purrr, sf, mapview, ggmap,
+               patchwork, osmdata, mapview, traveltime,
+               iterators, doParallel, foreach, parallel,
+               geosphere)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = TRUE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+##1. Read and Verify
+
+```{r}
+#Source of Data
+relative.path <- "./data/working/Time_distance_files"
+
+#Read/Tidy .RDS Time-Distance list of `sf` objects
+osm.df <- list.files(relative.path) %>%
+  enframe() %>%
+  rename(path = value) %>%
+  mutate(
+    name = str_split(path, ".rds") %>% 
+           map(1) %>%
+           unlist(),
+    path = str_c(relative.path, "/", path),
+    data = map(.x = path, ~read_rds(.x) %>%
+                           do.call(rbind.data.frame, .) %>%
+                           as_tibble())
+    )
+```
+
+
+####Number of Observations  
+
+
+```{r}
+#Check Number of Observations per Name
+n.obs <- osm.df$data %>% map_dbl(., nrow)
+names(n.obs) <- osm.df$name
+
+#Visualize
+enframe(n.obs) %>%
+  rename(observations = value) %>%
+  knitr::kable()
+```
+
+```{r}
+#Compare with Original OSM data
+osm.orig.df   <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
+  filter(variable != "Park")
+
+#Number of obs. for each variable
+table(osm.orig.df$variable)
+```
+
+
+
+Number of observations, points in the original data and `sf` objects in the time-distance data, appears to be correct. Next we check if there are `NULL`, `NA`, or empty values for our geometries (the polygon boundary geospatial data points).  
+
+####Missing Values  
+
+```{r}
+#Empty Geometries
+n.empty <- osm.df$data %>% 
+  map("geometry") %>%
+  map(attributes) %>%
+  map_dbl("n_empty") %>%
+  sum()
+
+#Zero Empty Geometries
+```  
+
+
+There are `r n.empty` missing geometries within these data.  
+
+##2. Calulate Binary Yes/No Fairfax Domocile in Polygon
+
+Here we are mapping over each variable (Playground, Sports Centers, Etc.).  
+
+```{r}
+
+
+
+poly.list <- do.call(rbind, st_geometry(read.df$osm_polygons)) %>%
+        lapply(as.tibble)
+
+npolys    <- length(poly.list)
+      
+lat.long.df <- tibble(
+        object_id = 1:npolys %>% as.factor(),
+        coord.df  = poly.list
+        ) %>%
+        unnest(coord.df) %>%
+        rename(
+        longitude = lon,
+        latitude  = lat
+        )
+
+```
+
