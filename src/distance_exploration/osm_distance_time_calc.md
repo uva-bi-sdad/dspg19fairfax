@@ -1,6 +1,6 @@
 OSM Distance-Time Calculation
 ================
-DSPG Business Innovation Team
+Quinton
 7/11/2019
 
 1. Read OSM Final Data
@@ -10,22 +10,10 @@ DSPG Business Innovation Team
 
 ``` r
 osm.df    <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv")
-```
-
-    ## Parsed with column specification:
-    ## cols(
-    ##   environment = col_character(),
-    ##   variable = col_character(),
-    ##   object_id = col_character(),
-    ##   longitude = col_double(),
-    ##   latitude = col_double()
-    ## )
-
-``` r
 osm.dim   <- dim(osm.df)
 osm.names <- names(osm.df) %>% paste0(., collapse = ", ")
 
-
+#Number of obs. for each variable
 table(osm.df$variable)
 ```
 
@@ -206,7 +194,7 @@ osm.df <- bind_cols(osm.df, api.grid)
 
 #Objective Task Function
 taskFun <- function(data, i) {
-  Sys.sleep(5.6)
+  Sys.sleep(6.01)
   
   traveltime_map(appId      = data$api_id[i],
                  apiKey     = data$api_keys[i],
@@ -230,7 +218,7 @@ result <- list()
 
 #Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
 
-for(j in 1:nrow(osm.df)) {
+for(j in 2:nrow(osm.df)) {
   
 #Count start time for each iteration  
 #a <- Sys.time()
@@ -245,7 +233,7 @@ result[[j]] <- foreach(i = 1:nrow(osm.df$data[[j]]),
 #Count end time
 #b <- Sys.time()
 #print(sprintf("Iteration %i took %f seconds", j, (b - a)))
-print(sprintf("Finished %s iteration"), osm.df$variable[j])
+print(sprintf("Finished %s iteration", osm.df$variable[j]))
 
 write_rds(result[[j]], sprintf("./data/working/Time_distance_files/%s.rds", 
                                osm.df$variable[j] %>% janitor::make_clean_names()))
