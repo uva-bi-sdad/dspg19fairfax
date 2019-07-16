@@ -45,7 +45,7 @@ options(scipen = 999999)
 
 ```{r}
 #Source of Data
-relative.path <- "./data/working/Time_distance_files"
+relative.path <- "./data/working/Time_distance_files/raw_time_distance_lists"
 
 #Read/Tidy .RDS Time-Distance list of `sf` objects
 osm.df <- list.files(relative.path) %>%
@@ -113,28 +113,25 @@ Here we are mapping over each variable (Playground, Sports Centers, Etc.). Extra
 ```{r}
 #Function to extract Lat Long
 lat.long <- function(osm_polygons) {
-poly.list <- do.call(rbind, st_geometry(osm_polygons)) %>%
-        lapply(enframe)
-
-npolys    <- length(poly.list)
-      
-lat.long.df <- tibble(
-        object_id = 1:npolys %>% as.factor(),
-        coord.df  = poly.list
-        ) %>%
-        unnest(coord.df) %>%
-        rename(
-        longitude = lon,
-        latitude  = lat
-        )
-return(lat.long.df)
+    st_coordinates(osm_polygons) %>%
+      as_tibble() %>%
+      rename(
+        longitude = X,
+        latitude  = Y,
+        object_id = L3
+      ) %>%
+    select(object_id, longitude, latitude)
 }
 
-osm.df$data[[1]] %>% 
+#Function to replace sf with data frame of id, long, and lat
+osm.df <- osm.df %>%
   mutate(
-    polygon_df = map(geometry, lat.long)
+    data = map(.x = data, 
+               ~ .x %>% 
+                 mutate(geometry = map(geometry, lat.long)) %>%
+                 select(geometry, lng, lat) %>%
+                 rename(longitude = lng,
+                        latitude  = lat))
   )
-
-osm.df$data[[1]][1,]$geometry %>% do.call(rbind, st_geometry(.))
 ```
 
