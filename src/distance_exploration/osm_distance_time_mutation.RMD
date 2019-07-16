@@ -77,7 +77,7 @@ enframe(n.obs) %>%
   knitr::kable()
 ```
 
-```{r}
+```{r warning = FALSE, message = FALSE}
 #Compare with Original OSM data
 osm.orig.df   <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
   filter(variable != "Park")
@@ -108,14 +108,13 @@ There are `r n.empty` missing geometries within these data.
 
 ##2. Calulate Binary Yes/No Fairfax Domocile in Polygon
 
-Here we are mapping over each variable (Playground, Sports Centers, Etc.).  
+Here we are mapping over each variable (Playground, Sports Centers, Etc.). Extract polygon boundary lat long from `sf` objects, store as data frame.  
 
 ```{r}
-
-
-
-poly.list <- do.call(rbind, st_geometry(read.df$osm_polygons)) %>%
-        lapply(as.tibble)
+#Function to extract Lat Long
+lat.long <- function(osm_polygons) {
+poly.list <- do.call(rbind, st_geometry(osm_polygons)) %>%
+        lapply(enframe)
 
 npolys    <- length(poly.list)
       
@@ -128,6 +127,14 @@ lat.long.df <- tibble(
         longitude = lon,
         latitude  = lat
         )
+return(lat.long.df)
+}
 
+osm.df$data[[1]] %>% 
+  mutate(
+    polygon_df = map(geometry, lat.long)
+  )
+
+osm.df$data[[1]][1,]$geometry %>% do.call(rbind, st_geometry(.))
 ```
 

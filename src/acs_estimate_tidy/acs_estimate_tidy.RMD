@@ -42,7 +42,7 @@ Below we write a fuction to read and bind all of the ACS .csv files together ins
 
 ```{r message = FALSE}
 #Define geography types (name of folder in ACS_etimates)
-geo.types <- c("blockgroup", "district", "highschool", "opportunity")
+geo.types <- c("blockgroup", "district", "highschool", "tract")
 
 #Function to read in each folder of .csv data (by variable est.)
 read_acs <- function(geo.type = "blockgroup") {
@@ -118,7 +118,8 @@ Next, we test the function on each geographical type, see that it is working pro
 blockgroup.list  <- read_acs("blockgroup")
 district.list    <- read_acs("district")
 highschool.list  <- read_acs("highschool")
-opportunity.list <- read_acs("opportunity")
+#opportunity.list <- read_acs("opportunity")
+tract.list       <- read_acs("tract")
 
 #Iterate and row_bind data together with Indicator for id and type of id (i.e. blockgroup, highschool, etc.)
 joined.df <- map_df(.x = geo.types, ~read_acs(.x)$data) %>%
@@ -126,11 +127,13 @@ joined.df <- map_df(.x = geo.types, ~read_acs(.x)$data) %>%
                      id_type = rep(geo.types, c(nrow(blockgroup.list$data),
                                            nrow(district.list$data), 
                                            nrow(highschool.list$data), 
-                                           nrow(opportunity.list$data))) %>%
+                                  #        nrow(opportunity.list$data),
+                                           nrow(tract.list$data))) %>%
                                            as.factor() %>%
                         fct_recode(supervisor_district = "district",
                                    highschool_district = "highschool",
-                                   census_tract = "opportunity"),
+                             #     opportunity_zone    = "opportunity"),
+                                   census_tract        = "tract"),
                      id = c(geoid, district, highschool, tract) %>%
                        na.omit()
                    ) %>%
@@ -153,8 +156,8 @@ write_acs <- function(data, geo.type = "blockgroup") {
 }
 
 #Write the regular and tidy (long) dataframes as csv's -- Only uncomment if you want to overwrite existing data
-#write_acs(joined.df, "all_geography")
-#write_acs(joined.tidy.df, "all_geography_tidy")
+write_acs(joined.df, "all_geography")
+write_acs(joined.tidy.df, "all_geography_tidy")
 ```
 
 
