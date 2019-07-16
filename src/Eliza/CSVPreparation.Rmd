@@ -39,7 +39,7 @@ options(scipen = 999999)
 #Read in Data
 ```{r, message = FALSE, warning = FALSE}
 #Read in the ACS wide and ACS long (tidy) data
-acs.df <- read_csv("/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv")
+acs.df <- read_csv("/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_16_acs_all_geography.csv")
 #acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
 ```
 
@@ -188,6 +188,6 @@ education.filter.df <- acs.education.df %>% filter(!id_type == "blockgroup") %>%
 ```{r}
 master_dataset_eliza = Reduce(function(x, y) merge(x, y, all=TRUE),list(employment.filter.df, ethnicity.filter.df, race.filter.df, marriage.filter.df, family.filter.df, language.filter.df, education.filter.df))
 
-#write.csv(master_dataset_eliza, "./data/working/master_dataset_eliza.csv")
+##write.csv(master_dataset_eliza, "./data/working/ACS_final_index_2/master_dataset_eliza.csv")
 
 ```
