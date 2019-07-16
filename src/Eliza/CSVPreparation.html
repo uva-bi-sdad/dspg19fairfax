@@ -161,7 +161,7 @@ options(scipen = 999999)</code></pre>
 <div id="read-in-data" class="section level1">
 <h1>Read in Data</h1>
 <pre class="r"><code>#Read in the ACS wide and ACS long (tidy) data
-acs.df &lt;- read_csv(&quot;/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_08_acs_all_geography.csv&quot;)
+acs.df &lt;- read_csv(&quot;/home/ent4pn/dspg19fairfax/data/working/ACS_joined_estimates/2019_07_16_acs_all_geography.csv&quot;)
 #acs.tidy.df &lt;- read_csv(&quot;./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv&quot;)</code></pre>
 <div id="unemployment" class="section level2">
 <h2>1. Unemployment</h2>
@@ -300,7 +300,7 @@ education.filter.df &lt;- acs.education.df %&gt;% filter(!id_type == &quot;block
 <h1>Merge Data</h1>
 <pre class="r"><code>master_dataset_eliza = Reduce(function(x, y) merge(x, y, all=TRUE),list(employment.filter.df, ethnicity.filter.df, race.filter.df, marriage.filter.df, family.filter.df, language.filter.df, education.filter.df))
 
-write.csv(master_dataset_eliza, &quot;master_dataset_eliza.csv&quot;)</code></pre>
+##write.csv(master_dataset_eliza, &quot;./data/working/ACS_final_index_2/master_dataset_eliza.csv&quot;)</code></pre>
 </div>
 
 
