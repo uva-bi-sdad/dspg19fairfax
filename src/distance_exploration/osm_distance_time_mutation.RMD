@@ -19,10 +19,10 @@ if (!require("pacman")) install.packages(pacman)
 #install.packages("dplyr") #need updated dplyr for sf objects
 
 #Load all the good stuff
-pacman::p_load(tidyverse, purrr, sf, mapview, ggmap,
+pacman::p_load(tidyverse, purrr, sf, sp, mapview, ggmap,
                patchwork, osmdata, mapview, traveltime,
                iterators, doParallel, foreach, parallel,
-               geosphere)
+               geosphere, rgeos, raster, RapidPolygonLookup)
 
 #Controlling figure output in markdown
 knitr::opts_chunk$set(
@@ -77,6 +77,8 @@ enframe(n.obs) %>%
   knitr::kable()
 ```
 
+
+Verify with original data for number of observations. 
 ```{r warning = FALSE, message = FALSE}
 #Compare with Original OSM data
 osm.orig.df   <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
@@ -120,18 +122,98 @@ lat.long <- function(osm_polygons) {
         latitude  = Y,
         object_id = L3
       ) %>%
-    select(object_id, longitude, latitude)
+    dplyr::select(longitude, latitude)
 }
 
 #Function to replace sf with data frame of id, long, and lat
-osm.df <- osm.df %>%
+osm.lat.long.df <- osm.df %>%
   mutate(
     data = map(.x = data, 
                ~ .x %>% 
                  mutate(geometry = map(geometry, lat.long)) %>%
-                 select(geometry, lng, lat) %>%
-                 rename(longitude = lng,
-                        latitude  = lat))
+                 dplyr::select(geometry) %>%
+                 mutate(id = 1:nrow(.x) %>% as.factor())
+              )
   )
+
+make_SPDF <- function(osm.data) {
+      #Grab the Poly ID's
+      id <- osm.data$id
+      #Transform RAW lat long for all objects into SPDF
+      osm.data$geometry %>%
+               map(.x = .,
+                   ~ .x %>%
+                     dplyr::select(longitude, latitude) %>%
+                     as.matrix() %>%
+                     Polygon()) %>%
+               map(list) %>%
+               map2(.x = ., .y = id, ~Polygons(.x, ID = .y)) %>%
+               SpatialPolygons() %>%
+               SpatialPolygonsDataFrame(., data.frame(id = id))
+      #Outputs an sp object of class SpatialPolygonsDataFrame
+}
+
+#Make a new data frame where the data is a list of SPDF objects corresponding to the Time-Distance Polygons by Variable
+osm.spdf <- osm.lat.long.df %>%
+            mutate(
+              data = map(.x = data, ~make_SPDF(.x))
+            )
+
+##Store for later
+#write_rds(osm.spdf, "./data/working/Time_distance_files/time_distance_spdf.RDS")
 ```
 
+Read in the Time-Distance OSM .RDS file and the Fairfax Housing stock data.  
+
+```{r message = FALSE}
+#Time Distance OSM lat long
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_spdf.RDS")
+
+#Fairfax Housing
+ffx.df  <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+  janitor::clean_names()
+
+#Figure out How to Calculate Point in Polygon 
+```
+
+
+
+#Testing RGEOS
+```{r}
+#Test out RapidPolygonLookup
+lat.long.df <- ffx.df %>%
+  dplyr::select(longitude, latitude)
+
+#Get fairfax boundary box
+ff.boundary <- getbb("fairfax county")
+
+#Test out RapidPolygonFunction on one variable's set of sf time-distance polygons
+osm.sf.df$data[[1]]$geometry %>% st_sf() %>% as_Spatial(from = ., cast = FALSE)
+
+osm.sf.df$data[[1]]$geometry %>% st_set_crs(CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")) %>% as(., "Spatial")
+
+pts <- st_sf(a=3, st_sfc(st_point(1:2)))
+sp_pts <- as(pts, "Spatial")
+as(st_geometry(pts), "Spatial")
+
+
+class(pts)
+class(st_geometry(pts))
+class(sp_pts)
+
+CropSpatialPolygonsDataFrame(x= osm.sf.df$data[[1]]$geometry[1],
+  bb= data.frame(X=c(-122.5132, -122.37),
+  Y= c(37.70760, 37.81849)))
+
+##  First project data into a planar coordinate system (here UTM zone 32)
+a <- Sys.time()
+point.in.polygon(osm.orig.df[1, ]$longitude,
+                 osm.orig.df[1, ]$latitude,
+                 osm.df$data[[1]]$geometry[[1]]$longitude,
+                 osm.df$data[[1]]$geometry[[1]]$latitude)
+b <- Sys.time()
+
+b - a
+
+
+```
