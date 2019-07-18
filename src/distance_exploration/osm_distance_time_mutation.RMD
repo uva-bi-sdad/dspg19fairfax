@@ -209,7 +209,7 @@ plotPolys(spdf1$polys)
 a <- Sys.time()
 
 test <- RapidPolygonLookup(lat.long.df, poly.list= spdf1,
-  k= 5, N = 10,
+  k= 5, N = nrow(lat.long.df),
   poly.id= "id",
   poly.id.colname = "time.dist.object",
   verbose= FALSE)
@@ -255,7 +255,7 @@ With some cursory verification, it appears that the package works exactly as adv
 ffx_in_polygon <- function(spdf, i) {
   
   RapidPolygonLookup(lat.long.df[i, ], poly.list = spdf,
-  k= 5, N = 1,
+  k = 3, N = 1,
   poly.id= "id",
   poly.id.colname = "time.dist.object",
   verbose= FALSE)$XY$rank %>%
@@ -281,7 +281,7 @@ osm.df <- osm.df %>%
 Here we parallelize the Point in Polygon by Nearest Neighbor search process, using 10/12 cores for safety and writing out each variable's data (just a logical vector of length `nrow(fairfax_housing_data)`). 
 
 
-```{r}
+```{r eval = FALSE}
 #Read in .RDS 
 osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
 
@@ -312,11 +312,80 @@ result[[j]] <- foreach(i = 1:nrow(lat.long.df),
 #Count end time
 #b <- Sys.time()
 #print(sprintf("Iteration %i took %f seconds", j, (b - a)))
-print(sprintf("Finished %s iteration", osm.df$name[j]))
+print(sprintf("Finished %s iteration @ %s", osm.df$name[j], Sys.time() %>% str_split(" ") %>% map_chr(2)))
 
 write_rds(result[[j]], sprintf("./data/working/Time_distance_files/time_distance_output/%s.rds", 
                                osm.df$name[j]))
 }
+```
+
+It's moving too slow, even for parallelizing, let's check it out.  
+
+```{r}
+#Test the speed
+#Function to Parallelize
+a <- Sys.time()
+map_lgl(.x = 1:10, ~ffx_in_polygon(osm.df$data[[1]]), .x)
+b <- Sys.time()
+b - a
+
+#Also it isn't working, lol.
+
+#vs. Funtion on it's own
+a <- Sys.time()
+RapidPolygonLookup(lat.long.df, poly.list= osm.df$data[[1]],
+  k= 5, N = 100,
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)$XY$rank %>%
+    is.na() %>%
+    ifelse(FALSE, TRUE)
+b <- Sys.time()
+b - a
+```
+
+
+Turns out by chopping it down into chunks to parallelize, it actually makes the algorithm significantly slower. Probably because it's storing previous information on the backend as it goes making it speed up with more points. Have to rethink the strategy here.  
+
+Going to parallelize so it runs all the different variables simultaneously
+
+```{r}
+#Build for first Variable
+ffx_in_polygon <- function(spdf, i) {
+  
+  RapidPolygonLookup(lat.long.df, poly.list = spdf,
+  k = 5, N = nrow(lat.long.df),
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)$XY$rank %>%
+    is.na() %>%
+    ifelse(FALSE, TRUE)
+
+    
+}
+
+#Read in .RDS 
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+
+###Parallelize###
+#detectCores()
+nCores <- 10
+registerDoParallel(nCores)
+taskFun <- ffx_in_polygon
+
+#Initalize result list (each variable)
+#result <- list()
+
+#Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
+
+result <- foreach(i = 1:nrow(osm.df), .combine = cbind,
+                  .packages = c("tidyverse", "sp", "sf", "RapidPolygonLookup")) %dopar% {
+                    
+  outSub <- taskFun(osm.df$data[[i]])
+  outSub
+}
+
+write_rds(result, "./data/working/Time_distance_files/time_distance_output/final_result.RDS")
 ```
 
 ##3. Tidy and Check Results
