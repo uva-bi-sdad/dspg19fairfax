@@ -230,7 +230,7 @@ result <- list()
 
 #Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
 
-for(j in 2:nrow(osm.df)) {
+for(j in 1:nrow(osm.df)) {
   
 #Count start time for each iteration  
 #a <- Sys.time()

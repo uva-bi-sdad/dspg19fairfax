@@ -159,7 +159,7 @@ osm.spdf <- osm.lat.long.df %>%
               data = map(.x = data, ~make_SPDF(.x))
             )
 
-##Store for later
+##Store each data frame for later for later
 #write_rds(osm.spdf, "./data/working/Time_distance_files/time_dist_spdf.RDS")
 ```
 
@@ -270,9 +270,24 @@ osm.df <- osm.df %>%
     data = map(.x = data, ~CropSpatialPolygonsDataFrame(x = .x, bb = ff.boundary))
   )
 
-#Parallelize
+#Write out for later
+#write_rds(osm.df, "./data/working/Time_distance_files/time_dist_cspdf.RDS")
+```
+
+
+
+####c. Generate the Final Data  
+
+Here we parallelize the Point in Polygon by Nearest Neighbor search process, using 10/12 cores for safety and writing out each variable's data (just a logical vector of length `nrow(fairfax_housing_data)`). 
+
+
+```{r}
+#Read in .RDS 
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+
+###Parallelize###
 #detectCores()
-nCores <- 8
+nCores <- 10
 registerDoParallel(nCores)
 taskFun <- ffx_in_polygon
 
@@ -281,13 +296,14 @@ result <- list()
 
 #Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
 
-for(j in 2:nrow(osm.df)) {
+for(j in 1:nrow(osm.df)) {
   
 #Count start time for each iteration  
 #a <- Sys.time()
 
 #1 X nrow(osm.df$data) iterations 
-result[[j]] <- foreach(i = 1:nrow(ffx.df),
+result[[j]] <- foreach(i = 1:nrow(lat.long.df),
+                       .combine = c,
                   .packages = c("tidyverse", "sp", "sf", "RapidPolygonLookup")) %dopar% {
   outSub <- taskFun(osm.df$data[[j]], i)
   outSub
@@ -296,11 +312,39 @@ result[[j]] <- foreach(i = 1:nrow(ffx.df),
 #Count end time
 #b <- Sys.time()
 #print(sprintf("Iteration %i took %f seconds", j, (b - a)))
-print(sprintf("Finished %s iteration", osm.df$variable[j]))
+print(sprintf("Finished %s iteration", osm.df$name[j]))
 
 write_rds(result[[j]], sprintf("./data/working/Time_distance_files/time_distance_output/%s.rds", 
-                               osm.df$variable[j] %>% janitor::make_clean_names()))
+                               osm.df$name[j]))
 }
 ```
+
+##3. Tidy and Check Results
+
+Here, we read and join the lists of logical vectors we created in an intelligible way.  
+
+```{r}
+#Source of Data
+relative.path <- "./data/working/Time_distance_files/time_distance_output"
+
+#Read/Tidy .RDS Time-Distance list of `sf` objects
+osm.final.df <- list.files(relative.path) %>%
+  enframe() %>%
+  rename(path = value) %>%
+  mutate(
+    name = str_split(path, ".rds") %>% 
+           map(1) %>%
+           unlist(),
+    path = str_c(relative.path, "/", path),
+    data = map(.x = path, ~read_rds(.x) %>%
+                        unlist())
+    )
+
+osm.final.df$data
+
+
+read_rds("./data/working/Time_distance_files/time_distance_output/alcohol.rds")
+```
+
 
 
