@@ -1,52 +1,14 @@
----
-title: "OSM Distance-Time Calculation"
-author: "Quinton"
-date: "7/11/2019"
-output: 
-  github_document: default
-  html_document: default
----
+OSM Distance-Time Calculation
+================
+Quinton
+7/11/2019
 
-```{r setup, include=FALSE, message = FALSE, warning = FALSE}
-#Setting root directory
-knitr::opts_knit$set(echo = TRUE,
-                     root.dir = rprojroot::find_rstudio_root_file())
+1. Read OSM Final Data
+----------------------
 
-#Load Pacman for multiple package loads
-if (!require("pacman")) install.packages(pacman)
+#### a. Introduction
 
-#Need most updated dplyr if haven't already done this
-#install.packages("dplyr") #need updated dplyr for sf objects
-
-#Load all the good stuff
-pacman::p_load(tidyverse, purrr, sf, mapview, ggmap,
-               patchwork, osmdata, mapview, traveltime,
-               iterators, doParallel, foreach, parallel,
-               geosphere)
-
-#Controlling figure output in markdown
-knitr::opts_chunk$set(
-#  fig.height =   
-  fig.width = 6,
-#  fig.asp = .5,
-  out.width = "90%",
-#  out.height = 
-  cache = TRUE
-)
-
-#Set Theme for ggplot2
-theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
-
-#Set Scientific notation output for knitr
-options(scipen = 999999)
-```
-
-
-##1. Read OSM Final Data  
-
-####a. Introduction
-
-```{r warning = FALSE, message = FALSE}
+``` r
 osm.df    <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv")
 osm.dim   <- dim(osm.df)
 osm.names <- names(osm.df) %>% paste0(., collapse = ", ")
@@ -55,15 +17,23 @@ osm.names <- names(osm.df) %>% paste0(., collapse = ", ")
 table(osm.df$variable)
 ```
 
-The dimensions of the raw data are `r osm.dim %>% paste0(., ", ")` and the variables contained are named `r osm.names`. 
+    ## 
+    ##       Alcohol   Convenience     Fast Food   Gas Station          Park 
+    ##            86           295           818           689         22915 
+    ##    Playground    Restaurant Sports Center   Supermarket Swimming Pool 
+    ##          4076          1490           594           950          4853 
+    ##    Team Sport         Track 
+    ##          9226          2037
 
-####b. Sample Park Boundary  
+The dimensions of the raw data are 48029, , 5, and the variables contained are named environment, variable, object\_id, longitude, latitude.
 
-Reading in the final osm data. Need to reduce the number of points to look through for the park polygons. Using centroids is definitely going to bias the distance-time coverage downward. Further, we are interested in whether they are close to the boundary. However, we don't need to look through every point. Instead we take a random sample of boundary points for each polygon and use those instead. 
+#### b. Sample Park Boundary
 
-This is a simplification for computational efficiency, but with random sampling, the only error should really be random. From a uniform distribution, we should get a relatively good sample of the boundary points to calculate distance_time. 
+Reading in the final osm data. Need to reduce the number of points to look through for the park polygons. Using centroids is definitely going to bias the distance-time coverage downward. Further, we are interested in whether they are close to the boundary. However, we don't need to look through every point. Instead we take a random sample of boundary points for each polygon and use those instead.
 
-```{r, warning = FALSE, message = FALSE}
+This is a simplification for computational efficiency, but with random sampling, the only error should really be random. From a uniform distribution, we should get a relatively good sample of the boundary points to calculate distance\_time.
+
+``` r
 #Investigating the Number of Points in each Park Boundary
 park.df <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
   nest(-c(environment, variable)) %>%
@@ -76,7 +46,12 @@ park.df <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
   ) 
 #Check out length of Parks
 park.df$length %>% summary()
+```
 
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ##    2.00   11.00   18.00   29.92   33.00  385.00
+
+``` r
 #Distribution
 park.df %>%
   ggplot(aes(x = length)) +
@@ -86,16 +61,20 @@ park.df %>%
     y = "Count",
     title = "Distribution of Park Boundary Length"
   )
+```
 
+<img src="osm_distance_time_calc_files/figure-markdown_github/unnamed-chunk-2-1.png" width="90%" />
+
+``` r
 #Actual unique number of parks
 nrow(park.df)
 ```
 
+    ## [1] 766
 
-As the variability in length (analogous to the size of park) is quite high, quite a few small parks and quite a few extremely large parks. As such we will take a random sample that is proportionate to the size of the park. To do say we say we will sample 25% of the boundary points at random.   
+As the variability in length (analogous to the size of park) is quite high, quite a few small parks and quite a few extremely large parks. As such we will take a random sample that is proportionate to the size of the park. To do say we say we will sample 25% of the boundary points at random.
 
-
-```{r warning = FALSE, message = FALSE}
+``` r
 #Mutating/sampling the spatial data by park object_id
 park.samp.df <- park.df %>%
   mutate(
@@ -107,7 +86,12 @@ park.samp.df <- park.df %>%
 
 #Check out new length of Parks
 park.samp.df$length_new %>% summary()
+```
 
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ##   1.000   3.000   4.000   6.379   7.000  77.000
+
+``` r
 #Distribution
 park.samp.df %>%
   ggplot(aes(x = length_new)) +
@@ -117,12 +101,13 @@ park.samp.df %>%
     y = "Count",
     title = "Distribution of Park Boundary Length"
   )
-
 ```
 
-####c. Alternatively make a Park centroid variable
+<img src="osm_distance_time_calc_files/figure-markdown_github/unnamed-chunk-3-1.png" width="90%" />
 
-```{r}
+#### c. Alternatively make a Park centroid variable
+
+``` r
 #Mutating/sampling the spatial data by park object_id
 park.cent.df <- park.df %>%
   mutate(
@@ -137,9 +122,9 @@ park.cent.df <- park.df %>%
   ) %>% unnest()
 ```
 
-####d. Replace Park Data in OSM Final Data  (either centroid or sample)
+#### d. Replace Park Data in OSM Final Data (either centroid or sample)
 
-```{r}
+``` r
 osm.df <- osm.df %>%
   nest(-c(environment, variable)) %>%
   mutate(
@@ -152,8 +137,9 @@ osm.df <- osm.df %>%
   )
 ```
 
-####e. For Now, filter out park; will deal with later
-```{r}
+#### e. For Now, filter out park; will deal with later
+
+``` r
 osm.df <- osm.df %>%
   filter(variable != "Park") %>%
   unnest()
@@ -161,10 +147,12 @@ osm.df <- osm.df %>%
 nrow(osm.df)
 ```
 
+    ## [1] 25114
 
-#2. Calculate Distance Time
+2. Calculate Distance Time
+==========================
 
-```{r eval = FALSE}
+``` r
 #Gather API Keys and ID's
 api.id   <- c("3c54476f",
               "12251934",
@@ -230,7 +218,7 @@ result <- list()
 
 #Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
 
-for(j in 1:nrow(osm.df)) {
+for(j in 2:nrow(osm.df)) {
   
 #Count start time for each iteration  
 #a <- Sys.time()
@@ -251,4 +239,3 @@ write_rds(result[[j]], sprintf("./data/working/Time_distance_files/%s.rds",
                                osm.df$variable[j] %>% janitor::make_clean_names()))
 }
 ```
-

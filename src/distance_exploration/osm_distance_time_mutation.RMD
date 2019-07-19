@@ -1,0 +1,419 @@
+---
+title: "OSM Time-Distance Mutation"
+author: "DSPG Business Innovation Team"
+date: "7/15/2019"
+output: 
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Load Pacman for multiple package loads
+if (!require("pacman")) install.packages(pacman)
+
+#Need most updated dplyr if haven't already done this
+#install.packages("dplyr") #need updated dplyr for sf objects
+
+#Load all the good stuff
+pacman::p_load(tidyverse, purrr, sf, sp, mapview, ggmap,
+               patchwork, osmdata, mapview, traveltime,
+               iterators, doParallel, foreach, parallel,
+               geosphere, rgeos, raster, RapidPolygonLookup)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = TRUE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+##1. Read and Verify
+
+```{r}
+#Source of Data
+relative.path <- "./data/working/Time_distance_files/raw_time_distance_lists"
+
+#Read/Tidy .RDS Time-Distance list of `sf` objects
+osm.df <- list.files(relative.path) %>%
+  enframe() %>%
+  rename(path = value) %>%
+  mutate(
+    name = str_split(path, ".rds") %>% 
+           map(1) %>%
+           unlist(),
+    path = str_c(relative.path, "/", path),
+    data = map(.x = path, ~read_rds(.x) %>%
+                           do.call(rbind.data.frame, .) %>%
+                           as_tibble())
+    )
+```
+
+
+####Number of Observations  
+
+
+```{r}
+#Check Number of Observations per Name
+n.obs <- osm.df$data %>% map_dbl(., nrow)
+names(n.obs) <- osm.df$name
+
+#Visualize
+enframe(n.obs) %>%
+  rename(observations = value) %>%
+  knitr::kable()
+```
+
+
+Verify with original data for number of observations. 
+```{r warning = FALSE, message = FALSE}
+#Compare with Original OSM data
+osm.orig.df   <- read_csv("./data/working/OSM_joined/7_10_2019_osm_joined.csv") %>%
+  filter(variable != "Park")
+
+#Number of obs. for each variable
+table(osm.orig.df$variable)
+```
+
+
+
+Number of observations, points in the original data and `sf` objects in the time-distance data, appears to be correct. Next we check if there are `NULL`, `NA`, or empty values for our geometries (the polygon boundary geospatial data points).  
+
+####Missing Values  
+
+```{r}
+#Empty Geometries
+n.empty <- osm.df$data %>% 
+  map("geometry") %>%
+  map(attributes) %>%
+  map_dbl("n_empty") %>%
+  sum()
+
+#Zero Empty Geometries
+```  
+
+
+There are `r n.empty` missing geometries within these data.  
+
+##2. Calulate Binary Yes/No Fairfax Domocile in Polygon
+
+Here we are mapping over each variable (Playground, Sports Centers, Etc.). Extract polygon boundary lat long from `sf` objects, store as data frame, then transform all lat/long df's to `sp` objects for later use (frames with nested sf, lat/long, and sp polygons are written out as .RDS in the working data `/Time_distance_files/` folder).  
+
+```{r}
+#Function to extract Lat Long
+lat.long <- function(osm_polygons) {
+    st_coordinates(osm_polygons) %>%
+      as_tibble() %>%
+      rename(
+        longitude = X,
+        latitude  = Y,
+        object_id = L3
+      ) %>%
+    dplyr::select(longitude, latitude)
+}
+
+#Function to replace sf with data frame of id, long, and lat
+osm.lat.long.df <- osm.df %>%
+  mutate(
+    data = map(.x = data, 
+               ~ .x %>% 
+                 mutate(geometry = map(geometry, lat.long)) %>%
+                 dplyr::select(geometry) %>%
+                 mutate(id = 1:nrow(.x) %>% as.factor())
+              )
+  )
+
+make_SPDF <- function(osm.data) {
+      #Grab the Poly ID's
+      id <- osm.data$id
+      #Transform RAW lat long for all objects into SPDF
+      osm.data$geometry %>%
+               map(.x = .,
+                   ~ .x %>%
+                     dplyr::select(longitude, latitude) %>%
+                     as.matrix() %>%
+                     Polygon()) %>%
+               map(list) %>%
+               map2(.x = ., .y = id, ~Polygons(.x, ID = .y)) %>%
+               SpatialPolygons() %>%
+               SpatialPolygonsDataFrame(., data.frame(id = id))
+      #Outputs an sp object of class SpatialPolygonsDataFrame
+}
+
+#Make a new data frame where the data is a list of SPDF objects corresponding to the Time-Distance Polygons by Variable
+osm.spdf <- osm.lat.long.df %>%
+            mutate(
+              data = map(.x = data, ~make_SPDF(.x))
+            )
+
+##Store each data frame for later for later
+#write_rds(osm.spdf, "./data/working/Time_distance_files/time_dist_spdf.RDS")
+```
+
+Read in the Time-Distance OSM (SPDF) .RDS file and the Fairfax Housing stock data.  
+
+```{r message = FALSE}
+#Time Distance OSM lat long
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_spdf.RDS")
+
+#Fairfax Housing
+ffx.df  <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+  janitor::clean_names()
+
+#Figure out How to Calculate Point in Polygon 
+```
+
+
+
+####a. Testing Rapid Polygon Lookup
+
+Here we test the package functions, cross reference with the raw data to ensure that the package functions do in fact work properly.  
+
+
+```{r}
+#Test out RapidPolygonLookup
+lat.long.df <- ffx.df %>%
+  dplyr::select(longitude, latitude)
+
+#Get fairfax boundary box in correct format
+ff.boundary <- getbb("fairfax county") %>% 
+               as.matrix() %>%
+               t() %>%
+               as_tibble() %>%
+               rename(
+                 X = x,
+                 Y = y
+               )
+#Test on the first SPDF data
+spdf1 <- CropSpatialPolygonsDataFrame(x= osm.df$data[[1]],
+  bb = ff.boundary)
+
+#Plot test, Checks out under cursory visual inspection
+plotPolys(spdf1$polys)
+
+#Test out the RapidPolyLookup Package for first 10 FFX Houses and First Variable's T-D Poly's
+##Also check time
+a <- Sys.time()
+
+test <- RapidPolygonLookup(lat.long.df, poly.list= spdf1,
+  k= 5, N = nrow(lat.long.df),
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)
+
+b <- Sys.time()
+time <- b - a
+#Main Out Put (X, Y = Long, Lat of orig. point; census.block = id of poly located, rank = # searched before hand)
+result <- test$XY
+result
+
+#Manually Check a Few with point in Polygon
+osm.lat.long.df <- read_rds("./data/working/Time_distance_files/time_dist_lat_long.RDS")
+
+point.test <- function(ff.obs, variable, poly.obs) {
+point.in.polygon(ffx.df[ff.obs, ]$longitude,
+                 ffx.df[ff.obs, ]$latitude,
+                 osm.lat.long.df$data[[variable]]$geometry[[poly.obs]]$longitude,
+                 osm.lat.long.df$data[[variable]]$geometry[[poly.obs]]$latitude)
+}
+
+#Checking if the 10th observation (which was NA) is truly not in any of the 86 polygons
+no.result <- c()
+for(i in 1:86) {
+  no.result <- c(no.result,
+                 point.test(10, 1, i))
+}
+sum(no.result)
+#Appears to be true!!!!!!!
+
+#Checking if all other are in the polygons they claim to be
+map2_dbl(.x = 1:9, .y = as.numeric(result$time.dist.object)[1:9], ~point.test(.x, 1, .y)) %>% mean() 
+
+#Also TRUE!!!!!!!!!!!
+###Looks like we are good to go and build the entire infrastructure to calculate for all ffx points, all vars
+```
+
+With some cursory verification, it appears that the package works exactly as advertised. Now we build the entire infrastructure to calculate binary YES/NO for each ffx housing unit, whether it is any of the time-distance polygons, per variable; utilizing this efficient nearest neighbor search algorithm to find nearby polygons to evaluate `point.in.polygon()`.  
+
+####b. Build the Infrastructure
+
+```{r message = FALSE, error = FALSE, warning = FALSE}
+#Build for first Variable
+ffx_in_polygon <- function(spdf, i) {
+  
+  RapidPolygonLookup(lat.long.df[i, ], poly.list = spdf,
+  k = 3, N = 1,
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)$XY$rank %>%
+    is.na() %>%
+    ifelse(FALSE, TRUE)
+    
+}
+
+#Convert all SPDF Objects to CSPDF for RapidPolyLookup
+osm.df <- osm.df %>%
+  mutate(
+    data = map(.x = data, ~CropSpatialPolygonsDataFrame(x = .x, bb = ff.boundary))
+  )
+
+#Write out for later
+#write_rds(osm.df, "./data/working/Time_distance_files/time_dist_cspdf.RDS")
+```
+
+
+
+####c. Generate the Final Data  
+
+Here we parallelize the Point in Polygon by Nearest Neighbor search process, using 10/12 cores for safety and writing out each variable's data (just a logical vector of length `nrow(fairfax_housing_data)`). 
+
+
+```{r eval = FALSE}
+#Read in .RDS 
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+
+###Parallelize###
+#detectCores()
+nCores <- 10
+registerDoParallel(nCores)
+taskFun <- ffx_in_polygon
+
+#Initalize result list (each variable)
+result <- list()
+
+#Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
+
+for(j in 1:nrow(osm.df)) {
+  
+#Count start time for each iteration  
+#a <- Sys.time()
+
+#1 X nrow(osm.df$data) iterations 
+result[[j]] <- foreach(i = 1:nrow(lat.long.df),
+                       .combine = c,
+                  .packages = c("tidyverse", "sp", "sf", "RapidPolygonLookup")) %dopar% {
+  outSub <- taskFun(osm.df$data[[j]], i)
+  outSub
+} 
+
+#Count end time
+#b <- Sys.time()
+#print(sprintf("Iteration %i took %f seconds", j, (b - a)))
+print(sprintf("Finished %s iteration @ %s", osm.df$name[j], Sys.time() %>% str_split(" ") %>% map_chr(2)))
+
+write_rds(result[[j]], sprintf("./data/working/Time_distance_files/time_distance_output/%s.rds", 
+                               osm.df$name[j]))
+}
+```
+
+It's moving too slow, even for parallelizing, let's check it out.  
+
+```{r}
+#Test the speed
+#Function to Parallelize
+a <- Sys.time()
+map_lgl(.x = 1:10, ~ffx_in_polygon(osm.df$data[[1]]), .x)
+b <- Sys.time()
+b - a
+
+#Also it isn't working, lol.
+
+#vs. Funtion on it's own
+a <- Sys.time()
+RapidPolygonLookup(lat.long.df, poly.list= osm.df$data[[1]],
+  k= 5, N = 100,
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)$XY$rank %>%
+    is.na() %>%
+    ifelse(FALSE, TRUE)
+b <- Sys.time()
+b - a
+```
+
+
+Turns out by chopping it down into chunks to parallelize, it actually makes the algorithm significantly slower. Probably because it's storing previous information on the backend as it goes making it speed up with more points. Have to rethink the strategy here.  
+
+Going to parallelize so it runs all the different variables simultaneously
+
+```{r}
+#Build for first Variable
+ffx_in_polygon <- function(spdf, i) {
+  
+  RapidPolygonLookup(lat.long.df, poly.list = spdf,
+  k = 5, N = nrow(lat.long.df),
+  poly.id= "id",
+  poly.id.colname = "time.dist.object",
+  verbose= FALSE)$XY$rank %>%
+    is.na() %>%
+    ifelse(FALSE, TRUE)
+
+    
+}
+
+#Read in .RDS 
+osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+
+###Parallelize###
+#detectCores()
+nCores <- 10
+registerDoParallel(nCores)
+taskFun <- ffx_in_polygon
+
+#Initalize result list (each variable)
+#result <- list()
+
+#Iterate over all variables (so we can store and save as we go *doesn't store object otherwise)
+
+result <- foreach(i = 1:nrow(osm.df), .combine = cbind,
+                  .packages = c("tidyverse", "sp", "sf", "RapidPolygonLookup")) %dopar% {
+                    
+  outSub <- taskFun(osm.df$data[[i]])
+  outSub
+}
+
+write_rds(result, "./data/working/Time_distance_files/time_distance_output/final_result.RDS")
+```
+
+##3. Tidy and Check Results
+
+Here, we read and join the lists of logical vectors we created in an intelligible way.  
+
+```{r}
+#Source of Data
+relative.path <- "./data/working/Time_distance_files/time_distance_output"
+
+#Read/Tidy .RDS Time-Distance list of `sf` objects
+osm.final.df <- list.files(relative.path) %>%
+  enframe() %>%
+  rename(path = value) %>%
+  mutate(
+    name = str_split(path, ".rds") %>% 
+           map(1) %>%
+           unlist(),
+    path = str_c(relative.path, "/", path),
+    data = map(.x = path, ~read_rds(.x) %>%
+                        unlist())
+    )
+
+osm.final.df$data
+
+
+read_rds("./data/working/Time_distance_files/time_distance_output/alcohol.rds")
+```
+
+
+
