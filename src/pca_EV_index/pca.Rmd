@@ -3,10 +3,8 @@ title: "Economic Vulerability variables PCA"
 author: "Cong Cong"
 date: "7/18/2019"
 output:
- html_document:
-    variant: markdown_github 
-    toc: true
-
+  github_document: default
+  toc: true
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning = FALSE}
