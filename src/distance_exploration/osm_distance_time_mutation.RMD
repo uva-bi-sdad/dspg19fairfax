@@ -45,7 +45,7 @@ options(scipen = 999999)
 
 ```{r}
 #Source of Data
-relative.path <- "./data/working/Time_distance_files/raw_time_distance_lists"
+relative.path <- "./data/working/Time_distance_files/public_transport_osm_files"
 
 #Read/Tidy .RDS Time-Distance list of `sf` objects
 osm.df <- list.files(relative.path) %>%
@@ -160,14 +160,16 @@ osm.spdf <- osm.lat.long.df %>%
             )
 
 ##Store each data frame for later for later
-#write_rds(osm.spdf, "./data/working/Time_distance_files/time_dist_spdf.RDS")
+#write_rds(osm.df, "./data/working/Time_distance_files/public_transport_osm_files/time_dist_sf.RDS")
+#write_rds(osm.spdf, "./data/working/Time_distance_files/public_transport_osm_files/time_dist_spdf.RDS")
+#write_rds(osm.lat.long.df, "./data/working/Time_distance_files/public_transport_osm_files/time_dist_lat_long.RDS")
 ```
 
 Read in the Time-Distance OSM (SPDF) .RDS file and the Fairfax Housing stock data.  
 
 ```{r message = FALSE}
 #Time Distance OSM lat long
-osm.df <- read_rds("./data/working/Time_distance_files/time_dist_spdf.RDS")
+osm.df <- read_rds("./data/working/Time_distance_files/public_transport_osm_files/time_dist_spdf.RDS")
 
 #Fairfax Housing
 ffx.df  <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
@@ -209,19 +211,19 @@ plotPolys(spdf1$polys)
 a <- Sys.time()
 
 test <- RapidPolygonLookup(lat.long.df, poly.list= spdf1,
-  k= 5, N = nrow(lat.long.df),
-  poly.id= "id",
+  k = 5, N = 100,
+  poly.id = "id",
   poly.id.colname = "time.dist.object",
-  verbose= FALSE)
+  verbose = FALSE)
 
 b <- Sys.time()
-time <- b - a
+b - a
 #Main Out Put (X, Y = Long, Lat of orig. point; census.block = id of poly located, rank = # searched before hand)
 result <- test$XY
-result
+result %>% head()
 
 #Manually Check a Few with point in Polygon
-osm.lat.long.df <- read_rds("./data/working/Time_distance_files/time_dist_lat_long.RDS")
+osm.lat.long.df <- read_rds("./data/working/Time_distance_files/public_transport_osm_files/time_dist_lat_long.RDS")
 
 point.test <- function(ff.obs, variable, poly.obs) {
 point.in.polygon(ffx.df[ff.obs, ]$longitude,
@@ -230,28 +232,60 @@ point.in.polygon(ffx.df[ff.obs, ]$longitude,
                  osm.lat.long.df$data[[variable]]$geometry[[poly.obs]]$latitude)
 }
 
-#Checking if the 10th observation (which was NA) is truly not in any of the 86 polygons
-no.result <- c()
-for(i in 1:86) {
-  no.result <- c(no.result,
-                 point.test(10, 1, i))
+#Checking if the observations match the raw data
+n.in <- vector(mode = "numeric", length = 86)
+final.tally <- vector(mode = "numeric", length = nrow(test$XY))
+
+for(i in 1:nrow(test$XY)) {
+  for(j in 1:86) {
+    n.in[j] <- point.test(i, 1, j) 
+  }
+  n.in <- sum(n.in)
+  final.tally[i] <- n.in
 }
-sum(no.result)
-#Appears to be true!!!!!!!
+if(sum(final.tally != 0) == (test$XY$time.dist.object %>% 
+                            as.numeric() %>% 
+                            is.na() %>% 
+                            map_lgl(isFALSE) %>%
+                            sum())) {
+  print(sprintf("All is quiet on the western front, the eagle has landed, and the raw data calculations match the package: %i objects found :)", sum(final.tally != 0)))
+} else { 
+  print(sprintf("You f'd something up, %i found in raw vs. %i found in package",
+                sum(final.tally != 0),
+                (test$XY$time.dist.object %>% 
+                            as.numeric() %>% 
+                            is.na() %>% 
+                            map_lgl(isFALSE) %>%
+                            sum())))
+  }
 
-#Checking if all other are in the polygons they claim to be
-map2_dbl(.x = 1:9, .y = as.numeric(result$time.dist.object)[1:9], ~point.test(.x, 1, .y)) %>% mean() 
+#Check that objects found do match
+#Data frame of positive object id's and which ffx housing observation that corresponds to
+positive.objs <- data.frame(object = test$XY$time.dist.object[!(is.na(test$XY$time.dist.object))] %>% as.numeric(),
+                            observation = which(!(is.na(test$XY$time.dist.object))))
 
-#Also TRUE!!!!!!!!!!!
+#Result vector (logical)
+res <- vector(mode = "numeric", length = nrow(positive.objs))
+
+for(i in 1:nrow(positive.objs)) {
+res[i] <- point.test(positive.objs$observation[i], 1, positive.objs$object[i])
+}
+if(sum(res == 1) == nrow(positive.objs)) {
+  print(sprintf("All is quiet on the western front, the eagle has landed, and the raw data calculations match the package: %i object id's and observations verified :)", sum(res == 1)))
+} else { 
+  print(sprintf("You f'd something up, %i match vs. %i found in package",
+                sum(res == 1),
+                nrow(positive.objs)))
+  }
 ###Looks like we are good to go and build the entire infrastructure to calculate for all ffx points, all vars
 ```
 
-With some cursory verification, it appears that the package works exactly as advertised. Now we build the entire infrastructure to calculate binary YES/NO for each ffx housing unit, whether it is any of the time-distance polygons, per variable; utilizing this efficient nearest neighbor search algorithm to find nearby polygons to evaluate `point.in.polygon()`.  
+With some cursory verification, it appears that the package works exactly as advertised. Now we build the entire infrastructure to calculate binary YES/NO for each ffx housing unit, whether it is any of the time-distance polygons, per variable; utilizing this efficient nearest neighbor search algorithm to find nearby polygons to evaluate `point.in.polygon()`. Also, utilizing $k = 5, 10, 20$ nearest neighbors; results are robust and do not change (in any discrepancy between raw and package results). Computationally, $k = 5$ is fastest, so we will use that as our final $k$. Additionally, all object ID's verified in the raw data. Build the infrastructure to calculate for ff housing units over all variables.  
 
 ####b. Build the Infrastructure
 
-```{r message = FALSE, error = FALSE, warning = FALSE}
-#Build for first Variable
+```{r message = FALSE, error = FALSE, warning = FALSE, eval = FALSE}
+#Build for first Variable (inital testing, revised function defined later after inital results)
 ffx_in_polygon <- function(spdf, i) {
   
   RapidPolygonLookup(lat.long.df[i, ], poly.list = spdf,
@@ -271,7 +305,7 @@ osm.df <- osm.df %>%
   )
 
 #Write out for later
-#write_rds(osm.df, "./data/working/Time_distance_files/time_dist_cspdf.RDS")
+#rite_rds(osm.df, "./data/working/Time_distance_files/public_transport_osm_files/time_dist_cspdf.RDS")
 ```
 
 
@@ -282,8 +316,10 @@ Here we parallelize the Point in Polygon by Nearest Neighbor search process, usi
 
 
 ```{r eval = FALSE}
+#Do not run!!!!!!!!!!
+
 #Read in .RDS 
-osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+osm.df <- read_rds("./data/working/Time_distance_files/public_transport_osm_files/time_dist_cspdf.RDS")
 
 ###Parallelize###
 #detectCores()
@@ -321,7 +357,9 @@ write_rds(result[[j]], sprintf("./data/working/Time_distance_files/time_distance
 
 It's moving too slow, even for parallelizing, let's check it out.  
 
-```{r}
+```{r eval = FALSE}
+#Do not run!!!!!!!!!!!
+
 #Test the speed
 #Function to Parallelize
 a <- Sys.time()
@@ -349,9 +387,9 @@ Turns out by chopping it down into chunks to parallelize, it actually makes the 
 
 Going to parallelize so it runs all the different variables simultaneously
 
-```{r}
+```{r eval = FALSE}
 #Build for first Variable
-ffx_in_polygon <- function(spdf, i) {
+ffx_in_polygon <- function(spdf) {
   
   RapidPolygonLookup(lat.long.df, poly.list = spdf,
   k = 5, N = nrow(lat.long.df),
@@ -365,7 +403,12 @@ ffx_in_polygon <- function(spdf, i) {
 }
 
 #Read in .RDS 
-osm.df <- read_rds("./data/working/Time_distance_files/time_dist_cspdf.RDS")
+osm.df <- read_rds("./data/working/Time_distance_files/public_transport_osm_files/time_dist_cspdf.RDS")
+
+#Test
+#test.res <- ffx_in_polygon(osm.df$data[[1]])
+#mean(test.res)
+
 
 ###Parallelize###
 #detectCores()
@@ -385,34 +428,39 @@ result <- foreach(i = 1:nrow(osm.df), .combine = cbind,
   outSub
 }
 
-write_rds(result, "./data/working/Time_distance_files/time_distance_output/final_result.RDS")
+#Give proper names and cast as tibble
+colnames(result) <- osm.df$name
+result <- result %>% as_tibble()
+
+#Write out final .RDS tibble
+#write_rds(result, "./data/working/Time_distance_files/time_distance_output/final_public_transit_result.RDS")
 ```
 
 ##3. Tidy and Check Results
 
-Here, we read and join the lists of logical vectors we created in an intelligible way.  
+Here, we read in the logical tibble corresponding to each OSM variable, join with the fairfax housing data, and write out a final obesegenic environment housing level data frame; to be aggregated by proportion by geography.  (Check the dims, all good)  
 
-```{r}
-#Source of Data
-relative.path <- "./data/working/Time_distance_files/time_distance_output"
+```{r message = FALSE, warning = FALSE}
+#Read in the final logical tibble and FFX data
+final.result <- read_rds("./data/working/Time_distance_files/time_distance_output/final_public_transit_result.RDS")
+ffx          <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>%
+                janitor::clean_names()
 
-#Read/Tidy .RDS Time-Distance list of `sf` objects
-osm.final.df <- list.files(relative.path) %>%
-  enframe() %>%
-  rename(path = value) %>%
-  mutate(
-    name = str_split(path, ".rds") %>% 
-           map(1) %>%
-           unlist(),
-    path = str_c(relative.path, "/", path),
-    data = map(.x = path, ~read_rds(.x) %>%
-                        unlist())
-    )
+#Correct number of Dimensions
+#rows
+#nrow(final.result) == nrow(ffx.df) --- TRUE
+#columns
+#ncol(final.result) == 11 --- TRUE
 
-osm.final.df$data
+#Join with the fairfax data, already in the correct order based on how we generated the final OSM logical data
+final.ffx <- bind_cols(ffx.df, final.result)
 
+#View
+head(final.ffx) %>% knitr::kable(digits = 3)
 
-read_rds("./data/working/Time_distance_files/time_distance_output/alcohol.rds")
+#Write out final data frame (.csv and .RDS; in data/working/Fairfax_Housing_OSM_Joined/)
+#write_csv(final.ffx, "./data/working/Fairfax_Housing_OSM_Joined/fairfax_osm_final.csv")
+#write_rds(final.ffx, "./data/working/Fairfax_Housing_OSM_Joined/fairfax_osm_final.RDS")
 ```
 
 
