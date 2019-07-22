@@ -48,18 +48,18 @@ fviz_screeplot(pr.data, ncp=10)
 
 Parallel analyis compares the scree of factors of the observed data with that of a random data matrix of the same size as the original. The parallel analysis for this dataset indicates that four components should be retained. There are two ways to tell this; (1) four of the eigenvalues in the actual data are greater than the simulated/resampled data, and (2) the dashed line for parallel analysis in the graph crosses the blue line before reaching the fifth component.
 ```{r}
-psych::fa.parallel(data,fa="pc")
+psych::fa.parallel(data)
 ```
 
 ###Variances explained by the principal components
 The proportion of variances retained by the principal components can be extracted as follows. ~63% of variance is explained by the first four pricipal components.
 ```{r}
 eigenvalues <- pr.data$eig
-head(eigenvalues)
+eigenvalues
 ```
 
 ##Dimension description
-###Variables correlated with the principal components
+###Variables related with the principal components
 The variables can be plotted as points in the component space using their loadings (correlation between a variable and a PC) as coordinates.
 ```{r}
 pr.data$var$coord
@@ -81,8 +81,8 @@ The following four variables are strongly related with Dimension 1:
 - percentage of households with limited English ability (limited_english)  
 
 ```{r}
-pr.desc <- dimdesc(pr.data, axes = c(1,2))
-pr.desc$Dim.1
+pr.desc <- dimdesc(pr.data, axes = c(1,2,3,4))
+pr.desc$Dim.4
 ```
 
 The following four variables are strongly related with Dimension2:   
@@ -92,7 +92,7 @@ The following four variables are strongly related with Dimension2:
 - median house value weighted by number of units (median_house_value)  
 - percentage of population with no highschool diploma (no_highschool)
 ```{r}
-pr.desc$Dim.2
+pr.desc$Dim.3
 ```
 
 ###Contributions of variables to the principal components
