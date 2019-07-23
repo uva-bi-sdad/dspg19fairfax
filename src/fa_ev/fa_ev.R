@@ -7,7 +7,7 @@ library(dplyr)
 
 # Read in data
 data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography,X)) %>% na.omit()
-any(is.na(datastd))
+any(is.na(data))
 
 # Center and standardize
 datastd <- data.frame(scale(data, center = TRUE, scale = TRUE))
@@ -52,5 +52,8 @@ fa.diagram(fact3, cut = 0.3)
 factor1 <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
 factor2 <- datastd %>% select(median_house_value, no_sewer, no_water)
 
-psych::alpha(factor1)
-psych::alpha(factor2)
+psych::alpha(factor1) # alpha = 0.94
+psych::alpha(factor2) # alpha = 0.80
+
+# First dimension: no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle
+# Second dimension: median_house_value, no_sewer, no_water
