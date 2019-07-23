@@ -33,7 +33,7 @@ options(scipen = 5)
 
 # PCA on ACS data based on Census Tract 
 ```{r}
-data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography,X)) %>% na.omit()
+data <- read.csv("./data/working/ACS_final_index_2/07_23_2019_joined_acs_final.csv") %>% select (-c(Geography,X)) %>% na.omit()
 
 #PCA with standadization
 pr.data <- PCA(data, scale.unit = TRUE, graph = FALSE)
