@@ -4,40 +4,6 @@ Cong Cong
 7/23/2019
 
 ``` r
-# Installation Libraries if needed
-
-# Libraries
-library(psych)
-library(tidyverse)
-library(stringr)
-library(ggplot2)
-library(ggmap)
-library(sf)
-library(rgdal)
-library(tigris)
-library(osmdata)
-library(data.table)
-
-# Setting root directory
-knitr::opts_knit$set(echo = TRUE,
-                     root.dir = rprojroot::find_rstudio_root_file())
-
-# Controlling figure output in markdown
-knitr::opts_chunk$set(
-  #  fig.height =   
-  fig.width = 6,
-  #  fig.asp = .5,
-  out.width = "90%",
-  #  out.height = 
-  cache = FALSE
-)
-# Set Theme for ggplot2
-theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
-# Set Scientific notation output for knitr
-options(scipen = 999999)
-```
-
-``` r
 #Base Map Function
 fairfax.gg <- function() {
   fairfax.box <- getbb("fairfax county")
@@ -59,97 +25,117 @@ fairfax.gg <- function() {
 }
 ```
 
-Factor Analysis
----------------
+Create functions
+----------------
 
 ``` r
-# Read in data
-data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography,X)) %>% na.omit()
-any(is.na(data))
+# Function: Create Economic Vulnerability Index
+# geo_type: "census_tract", "highschool_district", "supervisor_district"
+create_index <- function(data = data, geo_type = "census_tract", loadings = loadings){
+  df <- data %>% filter(id_type == geo_type) %>% .[,1] %>% data.frame()
+  slice_std <- data %>% filter(id_type == geo_type) %>%
+    select (-c(Geography, id_type)) %>% scale(.,center = TRUE, scale = TRUE) %>% data.frame()
+  factor1 <- slice_std %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
+  factor2 <- slice_std %>% select(median_house_value, no_sewer, no_water)
+    
+  df$PA1 <- factor1$no_insurance * loadings["no_insurance","PA1"] +
+    factor1$no_highschool * loadings["no_highschool","PA1"] +
+    factor1$hispanic * loadings["hispanic","PA1"] +
+    factor1$limited_english * loadings["limited_english","PA1"] +
+    factor1$poverty * loadings["poverty","PA1"] +
+    factor1$single_parent * loadings["single_parent","PA1"] + 
+    factor1$no_vehicle * loadings["no_vehicle","PA1"]
+  df$PA2 <- factor2$median_house_value * loadings["median_house_value","PA2"] +
+    factor2$no_sewer * loadings["no_sewer","PA2"] + 
+    factor2$no_water * loadings["no_water","PA2"]
+  df$EV_INDEX <- (df$PA1 * length(factor1) + df$PA2 * length(factor2))/(length(factor1)+length(factor2))
+  colnames(df)[1] <- "Geography"
+  return(df)
+}
+
+# Function: Plot
+# geo_shp: census_tract, highschool_district, supervisor_district
+# geo_name: "Census Tract", "Highschool District", "Supervisor District"
+plot_by_geography <- function(geo_shp = highschool_district, geo_name = "Highschool District"){
+  geo_shp@data <- geo_shp@data %>% mutate(id = row.names(.))
+  shp_df <- broom::tidy(geo_shp,region = "id")
+  shp_df <- shp_df %>% left_join(geo_shp@data, by = c("id"="id"))
+  fairfax.gg() + 
+    geom_polygon(data=shp_df, aes(x = long, y = lat, fill = EV_INDEX, group = group))+
+    ggtitle(label = "Economic Vulnerability Index by ${geo_name}" %>% str_interp()) +
+    scale_fill_viridis_c(option = "plasma",direction = -1) +
+    labs(caption = "Note: Darker color shows higher economic vulnerability.")
+}
 ```
 
-    ## [1] FALSE
+Generate factor analysis results
+--------------------------------
 
 ``` r
-# Center and standardize
-datastd <- data.frame(scale(data, center = TRUE, scale = TRUE))
-
-# Prepare correlation matrix
-cormat <- cor(datastd)
-
-# Selected model
-fact3 <- fa(r = cormat, nfactors = 2, rotate = "varimax", fm = "pa")
-
-# Two principal components
-factor1 <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
-factor2 <- datastd %>% select(median_house_value, no_sewer, no_water)
-```
-
-Calculate Economic Vulnerability Index
---------------------------------------
-
-``` r
+# Read data
+data <- read.csv("/home/cc2cm/dspg19fairfax/data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv")  %>% na.omit() 
+# Create loadings from the result of factor analysis
+datastd <- data %>% select (-c(Geography, id_type)) %>% scale(.,center = TRUE, scale = TRUE) %>% data.frame()
+final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle,
+                            median_house_value, no_sewer, no_water)
+finalcormat <- cor(final)
+finalfact <- fa(r = finalcormat, nfactors = 2, rotate = "varimax", fm = "pa")
 # Extract loadings
-loadings <- data.frame(unclass(fact3$loadings)) 
-
-# Create the economic vulnerability index dataset
-df <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% na.omit() %>% select (c(Geography)) 
-
-df$PA1 <- factor1$no_insurance * loadings["no_insurance","PA1"] +
-  factor1$no_highschool * loadings["no_highschool","PA1"] +
-  factor1$hispanic * loadings["hispanic","PA1"] +
-  factor1$limited_english * loadings["limited_english","PA1"] +
-  factor1$poverty * loadings["poverty","PA1"] +
-  factor1$single_parent * loadings["single_parent","PA1"] + 
-  factor1$no_vehicle * loadings["no_vehicle","PA1"]
-df$PA2 <- factor2$median_house_value * loadings["median_house_value","PA2"] +
-  factor2$no_sewer * loadings["no_sewer","PA2"] + 
-  factor2$no_water * loadings["no_water","PA2"]
-df$EV_INDEX <- df$PA1 + df$PA2
-head(df)
+loadings <- data.frame(unclass(finalfact$loadings)) 
 ```
 
-    ##                                        Geography       PA1        PA2
-    ## 1    Census Tract 4151, Fairfax County, Virginia -2.012080 -0.0368337
-    ## 2    Census Tract 4152, Fairfax County, Virginia -2.718547 -1.4041934
-    ## 3    Census Tract 4153, Fairfax County, Virginia  2.499514 -0.7201983
-    ## 4 Census Tract 4154.01, Fairfax County, Virginia  7.556317 -0.1280530
-    ## 5 Census Tract 4154.02, Fairfax County, Virginia -1.719321  0.2334382
-    ## 6    Census Tract 4155, Fairfax County, Virginia  1.767998 -0.2204577
-    ##    EV_INDEX
-    ## 1 -2.048914
-    ## 2 -4.122740
-    ## 3  1.779315
-    ## 4  7.428264
-    ## 5 -1.485883
-    ## 6  1.547540
-
-Plot by Census Tracts
----------------------
+Plot by census tract
+--------------------
 
 ``` r
-# Retrieve geography name
-id <- read.csv("./data/working/ACS_final_index_2/index.csv")
-df <- merge(df,id,by.x = "Geography",by.y = "Geography")
-# Join by GEOID
+df <- create_index(data, "census_tract", loadings)
 tracts <- tracts(state = '51', county = c('059'))
-tracts <- merge(tracts, df, by.x="GEOID",by.y="Id2",all.x=TRUE)#"+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0"
-# Transform and plot
-tracts@data <- tracts@data %>% mutate(id = row.names(.))
-shp_df <- broom::tidy(tracts,region = "id")
-shp_df <- shp_df %>% left_join(tracts@data, by = c("id"="id"))
-fairfax.gg() + 
-  geom_polygon(data=shp_df, aes(x = long, y = lat, fill = EV_INDEX, group = group))+
-  ggtitle(label = "Economic Vulnerability Index by Census Tracts")+
-  scale_fill_viridis_c(option = "plasma",direction = -1) +
-  labs(caption = "Note: Darker color shows higher economic vulnerability.")
+id <- read_csv("./data/working/ACS_final_index/index.csv")
+join <- merge(df,id,by.x = "Geography",by.y = "Geography")
+census_tract <- merge(tracts, join, by.x="GEOID",by.y="Id2",all.x=TRUE)
+plot_by_geography(census_tract, "Census Tract")
 ```
 
 <img src="Plot_EV_Index_files/figure-markdown_github/unnamed-chunk-4-1.png" width="90%" />
 
-Plot by Highschool Districts
+Plot by school district
+-----------------------
 
 ``` r
-# Read the geography
-#school_shp <- readOGR("./data/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp")
+df <- create_index(data, "highschool_district", loadings)
+school_shp <- readOGR("./data/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp")
 ```
+
+    ## OGR data source with driver: ESRI Shapefile 
+    ## Source: "/home/sdad/project_data/ffx/dspg2019fairfax/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp", layer: "High_School_Attendance_Areas"
+    ## with 25 features
+    ## It has 18 fields
+    ## Integer64 fields read as strings:  OBJECTID ZIP REGION
+
+``` r
+highschool_district<-merge(school_shp,df,by.x='SCHOOL_NAM',by.y='Geography',all.x=TRUE)
+plot_by_geography(highschool_district, "Highschool District")
+```
+
+<img src="Plot_EV_Index_files/figure-markdown_github/unnamed-chunk-5-1.png" width="90%" />
+
+Plot by supervisor district
+---------------------------
+
+``` r
+df <- create_index(data, "supervisor_district", loadings)
+svd_shp <- readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp")
+```
+
+    ## OGR data source with driver: ESRI Shapefile 
+    ## Source: "/home/sdad/project_data/ffx/dspg2019fairfax/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp", layer: "Supervisor_Districts"
+    ## with 9 features
+    ## It has 12 fields
+    ## Integer64 fields read as strings:  OBJECTID
+
+``` r
+supervisor_district<-merge(svd_shp,df,by.x='DISTRICT',by.y='Geography',all.x=TRUE)
+plot_by_geography(supervisor_district, "Supervisor District")
+```
+
+<img src="Plot_EV_Index_files/figure-markdown_github/unnamed-chunk-6-1.png" width="90%" />
