@@ -34,7 +34,7 @@ Create functions
 create_index <- function(data = data, geo_type = "census_tract", loadings = loadings){
   df <- data %>% filter(id_type == geo_type) %>% .[,1] %>% data.frame()
   slice_std <- data %>% filter(id_type == geo_type) %>%
-    select (-c(Geography, id_type)) %>% scale(.,center = TRUE, scale = TRUE) %>% data.frame()
+    select (-c(Geography, id_type)) %>% apply(., 2, function(x) (x - min(x))/(max(x)-min(x))) %>% data.frame()
   factor1 <- slice_std %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
   factor2 <- slice_std %>% select(median_house_value, no_sewer, no_water)
     
@@ -104,15 +104,6 @@ Plot by school district
 ``` r
 df <- create_index(data, "highschool_district", loadings)
 school_shp <- readOGR("./data/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp")
-```
-
-    ## OGR data source with driver: ESRI Shapefile 
-    ## Source: "/home/sdad/project_data/ffx/dspg2019fairfax/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp", layer: "High_School_Attendance_Areas"
-    ## with 25 features
-    ## It has 18 fields
-    ## Integer64 fields read as strings:  OBJECTID ZIP REGION
-
-``` r
 highschool_district<-merge(school_shp,df,by.x='SCHOOL_NAM',by.y='Geography',all.x=TRUE)
 plot_by_geography(highschool_district, "Highschool District")
 ```
