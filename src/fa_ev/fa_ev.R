@@ -6,7 +6,7 @@ library(dplyr)
 #
 
 # Read in data
-data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography,X)) %>% na.omit()
+data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography, id_type)) %>% na.omit()
 any(is.na(data))
 
 # Center and standardize
@@ -18,7 +18,7 @@ cormat <- cor(datastd)
 
 
 #
-# FA ----------------------------------------------------------------------------------------
+# FA exploratory ----------------------------------------------------------------------------------------
 #
 
 # Good model: INTERPRETABLE!
@@ -48,12 +48,33 @@ fa.diagram(fact3, cut = 0.3)
 # Eigenvalue = much of the variance of the observed variables a factor explains. A factor with eigenvalue ≥1 explains more variance than a single observed variable.
 # A factor loading represents the strength of association between each variable and the latent factor.
 
+
+#
+# FA tentative model ----------------------------------------------------------------------------------------
+#
+
+# Select indicators
+final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle,
+                            median_house_value, no_sewer, no_water)
+finalcormat <- cor(final)
+
+# FA
+finalfact <- fa(r = finalcormat, nfactors = 2, rotate = "varimax", fm = "pa")
+finalfact
+print(finalfact$loadings, cutoff = 0.3)
+fa.diagram(finalfact, cut = 0.3)
+
+
+#
+# Confirm ----------------------------------------------------------------------------------------
+#
+
 # Calculate internal consistency
-factor1 <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
-factor2 <- datastd %>% select(median_house_value, no_sewer, no_water)
+factor1 <- final %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
+factor2 <- final %>% select(median_house_value, no_sewer, no_water)
 
 psych::alpha(factor1) # alpha = 0.94
-psych::alpha(factor2) # alpha = 0.80
+psych::alpha(factor2) # alpha = 0.81
 
 # First dimension: no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle
 # Second dimension: median_house_value, no_sewer, no_water
