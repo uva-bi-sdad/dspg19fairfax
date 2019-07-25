@@ -64,32 +64,75 @@ fairfax.gg <- function() {
 }
 ```
 
-## Create functions
+## Create functions 
+### Functions for calculating Economic Vulnerability Index in three scenarios
 ```{r message = FALSE, warning = FALSE}
-# Function: Create Economic Vulnerability Index
+# Scenario 1: weight by model loadings
 # geo_type: "census_tract", "highschool_district", "supervisor_district"
-create_index <- function(data = data, geo_type = "census_tract", loadings = loadings){
+create_index_modelweight <- function(data = data, geo_type = "census_tract", loadings = loadings){
+  # Initialize dataframe
   df <- data %>% filter(id_type == geo_type) %>% .[,1] %>% data.frame()
+  # Select by id_type then normalize data (max&min)
   slice_std <- data %>% filter(id_type == geo_type) %>%
     select (-c(Geography, id_type)) %>% apply(., 2, function(x) (x - min(x))/(max(x)-min(x))) %>% data.frame()
+  # Variables in the first dimension
   factor1 <- slice_std %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
+  # Variables in the second dimension
   factor2 <- slice_std %>% select(median_house_value, no_sewer, no_water)
+  # Here the index is created by sum(variable value * loading * proportion explained)/sum(loading * proportion explained)
+  df$numerator <- proportion["Proportion Explained","PA1"] * (factor1$no_insurance * loadings["no_insurance","PA1"] +
+                                                                factor1$no_highschool * loadings["no_highschool","PA1"] +
+                                                                factor1$hispanic * loadings["hispanic","PA1"] +
+                                                                factor1$limited_english * loadings["limited_english","PA1"] +
+                                                                factor1$poverty * loadings["poverty","PA1"] +
+                                                                factor1$single_parent * loadings["single_parent","PA1"] +
+                                                                factor1$no_vehicle * loadings["no_vehicle","PA1"]) +
+                  proportion["Proportion Explained","PA2"] * (factor2$median_house_value * loadings["median_house_value","PA2"] +
+                                                                factor2$no_sewer * loadings["no_sewer","PA2"] +
+                                                                factor2$no_water * loadings["no_water","PA2"])
     
-  df$PA1 <- factor1$no_insurance * loadings["no_insurance","PA1"] +
-    factor1$no_highschool * loadings["no_highschool","PA1"] +
-    factor1$hispanic * loadings["hispanic","PA1"] +
-    factor1$limited_english * loadings["limited_english","PA1"] +
-    factor1$poverty * loadings["poverty","PA1"] +
-    factor1$single_parent * loadings["single_parent","PA1"] + 
-    factor1$no_vehicle * loadings["no_vehicle","PA1"]
-  df$PA2 <- factor2$median_house_value * loadings["median_house_value","PA2"] +
-    factor2$no_sewer * loadings["no_sewer","PA2"] + 
-    factor2$no_water * loadings["no_water","PA2"]
-  df$EV_INDEX <- (df$PA1 * length(factor1) + df$PA2 * length(factor2))/(length(factor1)+length(factor2))
+  df$denominator <- proportion["Proportion Explained","PA1"] * (loadings["no_insurance","PA1"] +
+                                                                  loadings["no_highschool","PA1"] +
+                                                                  loadings["hispanic","PA1"] +
+                                                                  loadings["limited_english","PA1"] +
+                                                                  loadings["poverty","PA1"] +
+                                                                  loadings["single_parent","PA1"] +
+                                                                  loadings["no_vehicle","PA1"])+
+                    proportion["Proportion Explained","PA2"] * (loadings["median_house_value","PA2"] +
+                                                                  loadings["no_sewer","PA2"] +
+                                                                  loadings["no_water","PA2"])
+  df$EV_INDEX <- df$numerator / df$denominator
   colnames(df)[1] <- "Geography"
   return(df)
 }
 
+# Scenario 2: no weight
+create_index_noweight <- function(data = data, geo_type = "census_tract", loadings = loadings){
+  # Initialize dataframe
+  df <- data %>% filter(id_type == geo_type) %>% .[,1] %>% data.frame()
+  # Select by id_type then normalize data (max&min)
+  slice_std <- data %>% filter(id_type == geo_type) %>%
+    select (-c(Geography, id_type)) %>% apply(., 2, function(x) (x - min(x))/(max(x)-min(x))) %>% data.frame()
+  # Variables in the first dimension
+  factor1 <- slice_std %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
+  # Variables in the second dimension
+  factor2 <- slice_std %>% select(median_house_value, no_sewer, no_water)
+  # Here the index is created by sum(variable value * loading * proportion explained)/sum(loading * proportion explained)
+  df$PA1 <- factor1$no_insurance + factor1$no_highschool + factor1$hispanic +
+    factor1$limited_english + factor1$poverty + factor1$single_parent + factor1$no_vehicle
+  df$PA2 <- factor2$median_house_value + factor2$no_sewer + factor2$no_water
+  df$EV_INDEX <- df$PA1 + df$PA2
+  colnames(df)[1] <- "Geography"
+  return(df)
+}
+
+# Scenario 3: suggested weight
+
+```
+
+
+### Plotting function
+```{r message = FALSE, warning = FALSE}
 # Function: Plot
 # geo_shp: census_tract, highschool_district, supervisor_district
 # geo_name: "Census Tract", "Highschool District", "Supervisor District"
@@ -109,20 +152,22 @@ plot_by_geography <- function(geo_shp = highschool_district, geo_name = "Highsch
 ## Generate factor analysis results
 ```{r message = FALSE, warning = FALSE}
 # Read data
-data <- read.csv("/home/cc2cm/dspg19fairfax/data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv")  %>% na.omit() 
+data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv")  %>% na.omit() 
 # Create loadings from the result of factor analysis
 datastd <- data %>% select (-c(Geography, id_type)) %>% scale(.,center = TRUE, scale = TRUE) %>% data.frame()
 final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle,
                             median_house_value, no_sewer, no_water)
 finalcormat <- cor(final)
 finalfact <- fa(r = finalcormat, nfactors = 2, rotate = "varimax", fm = "pa")
-# Extract loadings
+# Extract loadings and explained proportation
 loadings <- data.frame(unclass(finalfact$loadings)) 
+proportion <- print(finalfact) %>% .$Vaccounted %>% data.frame()
 ```
 
 ## Plot by census tract
 ```{r message = FALSE, warning = FALSE, results = "hide"}
-df <- create_index(data, "census_tract", loadings)
+df <- create_index_modelweight(data, "census_tract", loadings)
+#df <- create_index_noweight(data, "census_tract", loadings)
 tracts <- tracts(state = '51', county = c('059'))
 id <- read_csv("./data/working/ACS_final_index/index.csv")
 join <- merge(df,id,by.x = "Geography",by.y = "Geography")
@@ -132,7 +177,8 @@ plot_by_geography(census_tract, "Census Tract")
 
 ## Plot by school district
 ```{r message = FALSE, warning = FALSE, results = "hide"}
-df <- create_index(data, "highschool_district", loadings)
+df <- create_index_modelweight(data, "highschool_district", loadings)
+#df <- create_index_noweight(data, "highschool_district", loadings)
 school_shp <- readOGR("./data/original/Fairfax_Geographies/High_School_Attendance_Areas/High_School_Attendance_Areas.shp")
 highschool_district<-merge(school_shp,df,by.x='SCHOOL_NAM',by.y='Geography',all.x=TRUE)
 plot_by_geography(highschool_district, "Highschool District")
@@ -140,7 +186,8 @@ plot_by_geography(highschool_district, "Highschool District")
 
 ## Plot by supervisor district
 ```{r message = FALSE, warning = FALSE}
-df <- create_index(data, "supervisor_district", loadings)
+df <- create_index_modelweight(data, "supervisor_district", loadings)
+#df <- create_index_noweight(data, "supervisor_district", loadings)
 svd_shp <- readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp")
 supervisor_district<-merge(svd_shp,df,by.x='DISTRICT',by.y='Geography',all.x=TRUE)
 plot_by_geography(supervisor_district, "Supervisor District")
