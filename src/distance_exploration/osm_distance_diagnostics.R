@@ -14,10 +14,10 @@ library(stringr)
 #
 
 # Read in Fairfax housing data
-ffx.df  <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>% janitor::clean_names()
+houses  <- read_csv("./data/working/Fairfax_Housing_2018/fairfax_housing_2018_geo.csv") %>% janitor::clean_names()
 
 # Covert housing data to SF
-test <- st_as_sf(ffx.df, coords = c("longitude", "latitude"))
+houses <- st_as_sf(ffx.df, coords = c("longitude", "latitude"))
 
 # Read in OSM multipolygons
 osm <- read_rds("./data/working/Time_distance_files/time_dist_sf.RDS")
