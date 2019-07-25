@@ -1,0 +1,196 @@
+---
+title: "Obesogenic Dimensional Analysis"
+author: "DSPG Business Innovation Team"
+date: "7/24/2019"
+output: 
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Load Pacman for multiple package loads
+if (!require("pacman")) install.packages(pacman)
+
+#Need most updated dplyr if haven't already done this
+#install.packages("dplyr") #need updated dplyr for sf objects
+
+#Load all the good stuff
+pacman::p_load(tidyverse, purrr, sf, sp, mapview, ggmap,
+               patchwork, osmdata, mapview, traveltime,
+               iterators, doParallel, foreach, parallel,
+               geosphere, rgeos, raster, RapidPolygonLookup,
+               corrplot, psych, factoextra)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = TRUE
+)
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output for knitr
+options(scipen = 999999)
+```
+
+##1. Read & Join the Obesogenic Data
+
+
+Here we read the Fairfax Housing/OSM Binary Isochrone data, aggregate and nest by geography; read, clean, and nest by geography type the American Community Survey data (final Economic Vulnerability); and finally join by geography and write out a final Obesegenic Environment data frame for dimensional/factor analysis (and index construction).  
+
+```{r message = FALSE, warning = FALSE}
+#Read clean census track id's by manipulating the census tract number for matching join
+census.tract.df <- read_csv("./data/working/ACS_final_index_2/index.csv") %>%
+                     rename(geoid = Id2, census_tract = Geography) %>%
+                     mutate(
+                       geoid = census_tract %>% 
+                         parse_number() %>% 
+                         as.character() %>% 
+                         ifelse(str_length(.) == 4, str_c(., ".00"), .) %>%
+                         str_split("") %>%
+                         map_chr(.x = ., ~.x[-5] %>% str_c(., collapse = ""))
+                     )
+                     
+#Read in the Fairfax/OSM data
+ffx.osm.df <- read_rds("./data/working/Fairfax_Housing_OSM_Joined/fairfax_osm_final.RDS") %>%
+               mutate(
+                 geoid = geoid %>% as.character() %>% str_sub(., 6, nchar(.)-1)
+               )
+
+#Bind together (3 observations do not have census tract identified & 3 census tracts not represented)
+ffx.osm.df <- bind_rows(left_join(ffx.osm.df %>% filter(!is.na(geoid)), census.tract.df, by = "geoid"),
+            ffx.osm.df %>% filter(is.na(geoid))) %>%
+            dplyr::select(-parcel_id) %>%
+            rename(
+              highschool_district = highschool,
+              supervisor_district = district
+            ) %>%
+            gather(key = id_type, 
+                   value = geography,
+                   c(census_tract, highschool_district, supervisor_district)) %>%
+            mutate(id_type = as.factor(id_type)) %>%
+            nest(-c(id_type, geography))
+
+#Read in the Economic Vulnerability ACS/Housing Stock data
+acs.df     <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    id_type   = as.factor(id_type) 
+  ) %>%
+  dplyr::select(id_type, geography, everything()) %>%
+  nest(-c(id_type, geography)) 
+
+#Join together for final Obesogenic Data: ACS, Fairfax/OSM (aggregated by geography, median or mean respectively)
+obesity.df <- inner_join(ffx.osm.df, acs.df, by = c("id_type", "geography")) %>%
+              rename(ffx_osm_df = data.x, acs_df = data.y) %>%
+              unnest(acs_df) %>%
+              mutate(
+                ffx_osm_df = map(ffx_osm_df,
+                                 ~.x %>%
+                                   mutate(
+                                     no_supermarket = !supermarket,
+                                     no_playground  = !playground,
+                                     no_sports_center = !sports_center,
+                                     no_swimming_pool = !swimming_pool,
+                                     no_team_sport    = !team_sport,
+                                     no_track         = !track
+                                   ) %>%
+                                   dplyr::select(-c(supermarket, playground, sports_center,
+                                             swimming_pool, team_sport, track))),
+                ffx_osm_df = map(ffx_osm_df,
+                                 ~.x %>%
+                                   dplyr::select(alcohol:no_track) %>%
+                                   map_df(mean))
+              ) %>%
+              unnest()
+
+#Check counts
+obesity.df %>% 
+  group_by(id_type) %>%
+  summarise(
+    count = n()
+  ) %>% knitr::kable()
+
+#View Head and compare to make sure negativity mutation worked properly
+#head(obesity.df) %>% knitr::kable()
+#read_csv("./data/working/Obesogenic_final_data/2019_7_24_obesogenic_final.csv") %>% head()
+```
+
+```{r eval = FALSE, echo = FALSE}
+#Write out a final .csv and nested .RDS object
+write_csv(obesity.df, "./data/working/Obesogenic_final_data/2019_7_25_obesogenic_final.csv")
+obesity.df %>% 
+  nest(-id_type) %>%
+  write_rds(., "./data/working/Obesogenic_final_data/2019_7_25_obesogenic_final_nested.RDS")
+```
+
+Here we were very meticulous about making sure everything is matched, aggregated, and assigned to the right geographic unit. After joining three seperate data sets, Fairfax Housing, OSM, and ACS; we have our final working Obesogenic Environment data (stored in the `"./data/working/Obesogenic_final_data/"` folder). Note that three observations are missing census tracts but are not missing supervisor or highschool district, while three census tracts are not present at all, thus there are three fewer total observations than in the original ACS units of geography (due to the three missing census tracts, as verified in the table above).  
+
+
+
+
+##2. Dimensional Analysis  
+
+
+####a. Singular Value Decomposition  
+
+
+```{r}
+#Read the data
+obesity.df <- read_rds("./data/working/Obesogenic_final_data/2019_7_25_obesogenic_final_nested.RDS") %>%
+              mutate(
+                data = map(data,
+                           ~.x %>%
+                            dplyr::select(-c(minority, unmarried, single_parent, limited_english,
+                               low_income, not_enrolled, no_vehicle, long_commute)))
+              )
+
+              
+#Scale the data
+obesity.scale.df <- obesity.df %>%
+              mutate(
+                data = data %>% map(.x = ., ~na.omit(.x) %>%
+                                          dplyr::select(-geography) %>%
+                                          mutate_if(is.numeric, function(x) {
+                                            (x - mean(x))/sd(x)})),
+                cor_data = data %>% map(.x = ., ~.x %>% cor(., method = "pearson")),
+                pca_data = cor_data %>% map(princomp)
+              ) 
+
+#Singular Value Decomposition for Dimensions
+
+#Corplots
+obesity.scale.df$cor_data %>%
+  map(.x = ., ~.x %>% corrplot(type = "upper", tl.col = "black", tl.cex = 0.75))
+
+
+#Parallel analysis
+obesity.scale.df$cor_data %>%
+  map(.x = ., ~fa.parallel(.x))
+
+#Scree Plot
+obesity.scale.df$pca_data %>%
+  map(.x = ., ~fviz_eig(.x))
+
+#Feature Map
+obesity.scale.df$pca_data %>%
+  map(.x = ., ~.x %>% fviz_pca_var(.,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE))
+```
+
+
+
+All evidence points to 3 distinct dimensions, however there is some discrepancy between 2 and 3 by supervisor district (the third plots); however for consistency we should probably fit a three factor model for all geographies. There is actually some interesting stuff going on at the census_tract level, if you look at the feature map in PCA space, there almost looks like there are actually 4 distinct groupings (but the groupings in the positive direction of Dimension 1 are less clear).   
+
+

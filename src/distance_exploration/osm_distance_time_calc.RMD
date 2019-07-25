@@ -165,36 +165,35 @@ nrow(osm.df)
 #2. Calculate Distance Time
 
 ```{r eval = FALSE}
-#Gather API Keys and ID's
-api.id   <- c("3c54476f",
-              "12251934",
-              "b777323f",
-              "6969dd9f",
-              "c1c5c35f",
-              "5c7a743f",
-              "d5a88656",
-              "57763cf3"
-              )
+#Cong
+#App ID: 3c54476f
+#Key: 049992edda691331bc5bbe90dd7c6952
+
+#Mine
+#Application ID: 12251934
+#API key:  b5fb14aa79e0278e065d9de3ef95dbd9
+
+#Gather API keys and ID's for Parallelizing
 api.grid <- 
   tibble(
-    api_keys = c("049992edda691331bc5bbe90dd7c6952",
-                 "b5fb14aa79e0278e065d9de3ef95dbd9",
-                 "2b20066c5d1c020b6cd5db2ab72e45f6",
-                 "5cdf18d9d77c5c8d55b1bc63f8eb026b",
-                 "5f26cdb482e3dcd1fcaceb3782d63f4e",
-                 "81946416ebd0d8542cd38d7f1488da4c",
-                 "3099b337621a7249f3b48597b86348bb",
-                 "b1aa75203ab3d3b42f1f80d14bcef026"
+    api_keys = c("19bce8c3fc18e723a1315150fa56e8ab",
+                 "9e0866ac4ca48ff473d284caa2cb1f04",
+                 "83650a17db06975f9a290458275b1788",
+                 "76305fba3585306f803584fd9c1836e4",
+                 "499f74892de77d9b8712f309ec1c6668",
+                 "a258ee1b2888bb5d1fbc6b96af0008bb",
+                 "ccc4a7aea2d45d77c1090773d259ae79",
+                 "f3432d6da9070b29dc87dd21473bf2b2"
               ) %>%
                   rep(., times = ceiling(nrow(osm.df)/8)),
-    api_id  = c("3c54476f",
-                "12251934",
-                "b777323f",
-                "6969dd9f",
-                "c1c5c35f",
-                "5c7a743f",
-                "d5a88656",
-                "57763cf3"
+    api_id  = c("1f5210c1",
+                "f5476b5a",
+                "18d32e60",
+                "c3f5bc98",
+                "fca92235",
+                "224b4181",
+                "a32fa90b",
+                "20dc688b"
               ) %>%
                   rep(., times = ceiling(nrow(osm.df)/8))
   )
@@ -204,16 +203,21 @@ api.grid <- api.grid %>%
 
 osm.df <- bind_cols(osm.df, api.grid)
 
+#New input
+                               #  traveltime=1200,
+                               #  type="public_transport",
+                               #  departure="2019-6-27T08:00:00Z")
+
 #Objective Task Function
 taskFun <- function(data, i) {
-  Sys.sleep(6.01)
+  Sys.sleep(6.05)
   
   traveltime_map(appId      = data$api_id[i],
                  apiKey     = data$api_keys[i],
                  location   = c(data$latitude[i], data$longitude[i]),
-                 traveltime = 600,
-                 type       = "driving",
-                 departure  = "2019-7-10T18:00:00Z")
+                 traveltime = 1200,
+                 type       = "public_transport",
+                 departure  = "2019-6-27T08:00:00Z")
 }
 
 #Nest to save .RDS each time we finish an object
@@ -247,7 +251,7 @@ result[[j]] <- foreach(i = 1:nrow(osm.df$data[[j]]),
 #print(sprintf("Iteration %i took %f seconds", j, (b - a)))
 print(sprintf("Finished %s iteration", osm.df$variable[j]))
 
-write_rds(result[[j]], sprintf("./data/working/Time_distance_files/%s.rds", 
+write_rds(result[[j]], sprintf("./data/working/Time_distance_files/public_transport_osm_files/%s.rds", 
                                osm.df$variable[j] %>% janitor::make_clean_names()))
 }
 ```
