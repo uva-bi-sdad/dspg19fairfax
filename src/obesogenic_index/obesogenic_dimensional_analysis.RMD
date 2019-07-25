@@ -124,6 +124,43 @@ Here we were very meticulous about making sure everything is matched, aggregated
 
 
 
+##2. Dimensional Analysis  
+
+
+####a. Singular Value Decomposition  
+
+
+```{r}
+#Read the data
+obesity.df <- read_rds("./data/working/Obesogenic_final_data/2019_7_24_obesogenic_final_nested.RDS") %>%
+              mutate(
+                data = map(data,
+                           ~.x %>%
+                            dplyr::select(-c(minority, unmarried, single_parent, limited_english,
+                               low_income, not_enrolled, no_vehicle, long_commute)))
+              )
+
+              
+#Scale the data
+obesity.scale.df <- obesity.df %>%
+              mutate(
+                data = data %>% map(.x = ., ~.x %>%
+                                          mutate_if(is.numeric, function(x) {(x - mean(x))/sd(x)}))
+              ) 
+
+  bind_cols(obesity.df$data[[1]] %>%
+                     dplyr::select(geography),
+            obesity.df$data[[1]]  %>%
+                     dplyr::select(-geography) %>%
+                     map_df(scale)
+                           )
+    
+
+a <- obesity.df$data[[1]]
+  
+  data <- obesity.df$data[[1]]
+```
+
 
 
 
