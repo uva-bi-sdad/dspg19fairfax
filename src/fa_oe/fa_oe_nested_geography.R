@@ -1,20 +1,41 @@
 library(psych)
-library(dplyr)
+library(tidyverse)
 
 #
 # Prepare data ----------------------------------------------------------------------------------------
 #
 
 # Read in data
-data <- read.csv("./data/working/Obesogenic_final_data/2019_7_24_obesogenic_final.csv") %>% select(-id_type, -geography)
-any(is.na(data))
+#data <- read_csv("./data/working/Obesogenic_final_data/2019_7_25_obesogenic_final.csv") %>% select(-id_type, -geography) %>% na.omit()
+#any(is.na(data))
 
 # Center and standardize
-datastd <- data.frame(scale(data, center = TRUE, scale = TRUE))
-describe(datastd)
+#datastd <- data.frame(scale(data, center = TRUE, scale = TRUE))
+#describe(datastd)
 
 # Prepare correlation matrix
-cormat <- cor(datastd, use = "na.or.complete")
+#cormat <- cor(datastd, use = "na.or.complete")
+
+#Read the data
+obesity.df <- read_rds("./data/working/Obesogenic_final_data/2019_7_25_obesogenic_final_nested.RDS") %>%
+  mutate(
+    data = map(data,
+               ~.x %>%
+                 dplyr::select(-c(minority, unmarried, single_parent, limited_english,
+                                  low_income, not_enrolled, no_vehicle, long_commute)))
+  )
+
+
+#Scale the data
+obesity.scale.df <- obesity.df %>%
+  mutate(
+    data = data %>% map(.x = ., ~na.omit(.x) %>%
+                          dplyr::select(-geography) %>%
+                          mutate_if(is.numeric, function(x) {
+                            (x - mean(x))/sd(x)})),
+    cor_data = data %>% map(.x = ., ~.x %>% cor(., method = "pearson")),
+    pca_data = cor_data %>% map(princomp)
+  ) 
 
 
 #
@@ -28,27 +49,6 @@ cormat <- cor(datastd, use = "na.or.complete")
 
 # Play with rotations and algorithms 
 
-# Run FA / exploratory
-fact1 <- fa(r = cormat, nfactors = 4, rotate = "oblimin", fm = "ml")
-fact1
-print(fact1$loadings, cutoff = 0.3)
-fa.diagram(fact1, cut = 0.3)
-
-fact2 <- fa(r = cormat, nfactors = 3, rotate = "varimax", fm = "pa")
-fact2
-print(fact2$loadings, cutoff = 0.3)
-fa.diagram(fact2, cut = 0.5)
-
-fact3 <- fa(r = cormat, nfactors = 2, rotate = "varimax", fm = "pa")
-fact3
-print(fact3$loadings, cutoff = 0.3)
-fa.diagram(fact3, cut = 0.3)
-
-fact4 <- fa(r = finalcormat, nfactors = 3, rotate = "varimax", fm = "pa")
-fact4
-print(fact4$loadings, cutoff = 0.3)
-fa.diagram(fact4, cut = 0.3)
-
 # Each factor captures a certain amount of the overall variance in the observed variables.
 # Eigenvalue = much of the variance of the observed variables a factor explains. A factor with eigenvalue ≥1 explains more variance than a single observed variable.
 # A factor loading represents the strength of association between each variable and the latent factor.
@@ -59,9 +59,18 @@ fa.diagram(fact4, cut = 0.3)
 #
 
 # Select indicators
-final <- datastd %>% select(no_insurance, no_highschool, hispanic, poverty,
-                            restaurant, fast_food, gas_station, supermarket, alcohol, convenience, swimming_pool, team_sport, playground)
-finalcormat <- cor(final)
+final <- obesity.df %>%
+  mutate(
+    data = data %>% map(.x = ., ~na.omit(.x) %>%
+                          dplyr::select(no_insurance, no_highschool, hispanic, poverty,
+                                        restaurant, fast_food, gas_station, no_supermarket, 
+                                        alcohol, convenience, no_swimming_pool, no_team_sport, no_playground) %>%
+                          mutate_if(is.numeric, function(x) {
+                            (x - mean(x))/sd(x)})),
+    cor_data        = data %>% map(.x = ., ~.x %>% cor(., method = "pearson")),
+    pca_data        = cor_data %>% map(princomp), 
+    factor_analysis = map(.x = cor_data, ~fa(.x, nfactors = 3, rotate = "varimax", fm = "pa"))
+  )
 
 # FA
 finalfact <- fa(r = finalcormat, nfactors = 3, rotate = "varimax", fm = "pa")
