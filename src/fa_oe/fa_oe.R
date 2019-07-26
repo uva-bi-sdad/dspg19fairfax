@@ -6,7 +6,7 @@ library(dplyr)
 #
 
 # Read in data
-data <- read.csv("./data/working/Obesogenic_final_data/2019_7_24_obesogenic_final.csv") %>% select(-id_type, -geography)
+data <- read.csv("./data/working/Obesogenic_final_data/2019_7_24_obesogenic_final.csv") %>% filter(id_type == "census_tract") %>% select(-id_type, -geography)
 any(is.na(data))
 
 # Center and standardize
@@ -31,23 +31,23 @@ cormat <- cor(datastd, use = "na.or.complete")
 # Run FA / exploratory
 fact1 <- fa(r = cormat, nfactors = 4, rotate = "oblimin", fm = "ml")
 fact1
-print(fact1$loadings, cutoff = 0.3)
-fa.diagram(fact1, cut = 0.3)
+print(fact1$loadings, cutoff = 0.5)
+fa.diagram(fact1, cut = 0.5)
 
 fact2 <- fa(r = cormat, nfactors = 3, rotate = "varimax", fm = "pa")
 fact2
-print(fact2$loadings, cutoff = 0.3)
+print(fact2$loadings, cutoff = 0.5)
 fa.diagram(fact2, cut = 0.5)
 
 fact3 <- fa(r = cormat, nfactors = 2, rotate = "varimax", fm = "pa")
 fact3
-print(fact3$loadings, cutoff = 0.3)
-fa.diagram(fact3, cut = 0.3)
+print(fact3$loadings, cutoff = 0.5)
+fa.diagram(fact3, cut = 0.5)
 
-fact4 <- fa(r = finalcormat, nfactors = 3, rotate = "varimax", fm = "pa")
+fact4 <- fa(r = cormat, nfactors = 3, rotate = "varimax", fm = "pa")
 fact4
-print(fact4$loadings, cutoff = 0.3)
-fa.diagram(fact4, cut = 0.3)
+print(fact4$loadings, cutoff = 0.5)
+fa.diagram(fact4, cut = 0.5)
 
 # Each factor captures a certain amount of the overall variance in the observed variables.
 # Eigenvalue = much of the variance of the observed variables a factor explains. A factor with eigenvalue ≥1 explains more variance than a single observed variable.
