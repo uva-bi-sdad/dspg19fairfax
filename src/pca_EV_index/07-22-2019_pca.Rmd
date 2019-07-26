@@ -1,0 +1,151 @@
+---
+title: "Economic Vulerability variables PCA"
+author: "Cong Cong"
+date: "7/18/2019"
+output:
+  github_document: default
+  toc: true
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+#Setting root directory
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+library(tidyverse)
+library(FactoMineR)
+library(factoextra)
+library(stats)
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+  cache = FALSE
+)
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 5)
+```
+
+# PCA on ACS data based on Census Tract 
+```{r}
+data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography,id_type)) %>% na.omit()
+
+#PCA with standadization
+pr.data <- PCA(data, scale.unit = TRUE, graph = FALSE)
+```
+
+##Identify Dimensions
+###Number of principle components
+One way to determine the number of factors or components in a data matrix is to examine the scree plot of the successive eigenvalues. Sharp breaks in the plot suggest the appropriate number of components or factors to extract. The scree plot below shows ~35% of the variances contained in the data are retained by the first principal component. The elbow is between the first and the second dimensions.
+```{r}
+fviz_screeplot(pr.data, ncp=10)
+```
+
+Parallel analyis compares the scree of factors of the observed data with that of a random data matrix of the same size as the original. The parallel analysis for this dataset indicates that four components should be retained. There are two ways to tell this; (1) four of the eigenvalues in the actual data are greater than the simulated/resampled data, and (2) the dashed line for parallel analysis in the graph crosses the blue line before reaching the fifth component.
+```{r}
+psych::fa.parallel(data)
+```
+
+###Variances explained by the principal components
+The proportion of variances retained by the principal components can be extracted as follows. ~63% of variance is explained by the first four pricipal components.
+```{r}
+eigenvalues <- pr.data$eig
+eigenvalues
+```
+
+##Dimension description
+###Variables related with the principal components
+The variables can be plotted as points in the component space using their loadings (correlation between a variable and a PC) as coordinates.
+```{r}
+pr.data$var$coord
+```
+
+Correlation circle projects the features/variables of the data into the space of the first two dimensions. The angle shows how the variables are related as well as their directions relative to the first two dimensions
+```{r}
+fviz_pca_var(pr.data,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+```
+
+The following four variables are strongly related with Dimension 1:   
+- percentage of households with no health insurance coverage (no_hicov_pct)   
+- percentage of population with lower-than-median income (low_income)  
+- percentage of Hispanic population (hispanic_pct)  
+- percentage of population with no highschool diploma (no_highschool)
+- percentage of households with limited English ability (limited_english)  
+
+```{r}
+pr.desc <- dimdesc(pr.data, axes = c(1,2,3,4))
+pr.desc$Dim.4
+```
+
+The following four variables are strongly related with Dimension2:   
+- proportion of housing with no sewer available (no_sewer) 
+- proportion of housing with no water available (no_water) 
+- proportion of people aged < 18 (age_below_18)
+- median house value weighted by number of units (median_house_value)  
+- percentage of population with no highschool diploma (no_highschool)
+```{r}
+pr.desc$Dim.3
+```
+
+###Contributions of variables to the principal components
+The color (or the length if the vectors) on the correlation circle shows the contribution of variable to the principal components. The amount of contributions can also be extracted as follows.
+```{r}
+pr.data$var$contrib
+```
+
+If the contribution of the variables were uniform, the expected value would be 1/length(variables) = 1/22 = 4.5%.The red dashed line on the graph below indicates the expected average contribution. A variable with a contribution larger than this cutoff could be considered as important in contributing to the component.
+```{r}
+fviz_pca_contrib(pr.data, choice = "var", axes = 1)
+fviz_pca_contrib(pr.data, choice = "var", axes = 2)
+```
+
+##Conclusions
+There are four principal components in the dataset of ACS variables on census tract. These components explains ~63% of the total variance. The first component is best represented by economic and social status of the population including health insurance coverage, income, Hispanic population, limited English ability. The second component is best represented by housing conditions including water and sewer availability and median house value.
+
+# PCA on ACS data based on High School District
+```{r,include=FALSE}
+data <- read.csv("./data/working/ACS_final_index_2/07_11_2019_joined_acs_final.csv") %>% filter(id_type=="highschool_district") %>% select (-c(X, X.x, id, id_type, X.y)) %>% na.omit()
+
+#PCA with standadization
+pr.data <- PCA(data, scale.unit = TRUE, graph = FALSE)
+
+fviz_screeplot(pr.data, ncp=10)
+psych::fa.parallel(data,fa="pc")
+
+fviz_pca_var(pr.data, col.var="contrib",repel = TRUE)+
+  scale_color_gradient2(low="white", mid="blue", 
+                      high="red")
+
+pr.desc <- dimdesc(pr.data, axes = c(1,2))
+pr.desc$Dim.1
+
+fviz_pca_contrib(pr.data, choice = "var", axes = 1)
+```
+
+# PCA on ACS data based on Supervisor District
+```{r,include=FALSE}
+data <- read.csv("./data/working/ACS_final_index_2/07_11_2019_joined_acs_final.csv") %>% filter(id_type=="supervisor_district") %>% select (-c(X, X.x, id, id_type, X.y)) %>% na.omit()
+
+#PCA with standadization
+pr.data <- PCA(data, scale.unit = TRUE, graph = FALSE)
+
+fviz_screeplot(pr.data, ncp=10)
+psych::fa.parallel(data,fa="pc")
+
+fviz_pca_var(pr.data, col.var="contrib",repel = TRUE)+
+  scale_color_gradient2(low="white", mid="blue", 
+                      high="red")
+
+pr.desc <- dimdesc(pr.data, axes = c(1,2))
+pr.desc$Dim.1
+
+fviz_pca_contrib(pr.data, choice = "var", axes = 1)
+```
