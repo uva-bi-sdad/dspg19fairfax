@@ -54,7 +54,7 @@ fa.diagram(fact3, cut = 0.3)
 #
 
 # Select indicators
-final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle,
+final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle, minority,
                             median_house_value, no_sewer, no_water)
 finalcormat <- cor(final)
 
@@ -70,10 +70,10 @@ fa.diagram(finalfact, cut = 0.3)
 #
 
 # Calculate internal consistency
-factor1 <- final %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle)
+factor1 <- final %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle, minority)
 factor2 <- final %>% select(median_house_value, no_sewer, no_water)
 
-psych::alpha(factor1) # alpha = 0.94
+psych::alpha(factor1) # alpha = 0.93
 psych::alpha(factor2) # alpha = 0.81
 
 # First dimension: no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle
