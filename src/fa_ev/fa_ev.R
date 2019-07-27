@@ -34,7 +34,7 @@ fact1
 print(fact1$loadings, cutoff = 0.3)
 fa.diagram(fact1, cut = 0.3)
 
-fact2 <- fa(r = cormat, nfactors = 4, rotate = "varimax", fm = "pa")
+fact2 <- fa(r = cormat, nfactors = 3, rotate = "varimax", fm = "pa")
 fact2
 print(fact2$loadings, cutoff = 0.3)
 fa.diagram(fact2, cut = 0.3)
@@ -54,7 +54,7 @@ fa.diagram(fact3, cut = 0.3)
 #
 
 # Select indicators
-final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle, minority,
+final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle, minority, 
                             median_house_value, no_sewer, no_water)
 finalcormat <- cor(final)
 
