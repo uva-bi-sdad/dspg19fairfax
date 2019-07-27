@@ -98,7 +98,7 @@ employment$unemployed <- employment$unemployed_est/employment$SUM
 enrollment <- acs.df %>% select("id_type","id","enrolled_est","unenrolled_est") %>% 
   filter(id_type=="census_tract")
 enrollment$not_enrolled <- enrollment$unenrolled_est/(enrollment$enrolled_est+enrollment$unenrolled_est)
-
+ 
 #15.Car ownership
 vehicle <- acs.df %>% select("id_type","id","vehicle0_est","vehicle1_est","vehicle2_est","vehicle3up_est") %>% 
   filter(id_type=="census_tract")
@@ -120,14 +120,12 @@ ownership$renters <- ownership$rented_est/(ownership$owned_est+ownership$rented_
 costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","grpi30_50_est","grpi50up_est") %>%
   filter(id_type=="census_tract")
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
-costburden_burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
-  
+costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
-acsdf <- cbind.data.frame(age$id,age$age_below_18,age$age_above_65,education$no_highschool,race$minority,
-                          ethnicity$hispanic,maritalstatus$unmarried,family$single_parent,
-                          language$limited_english,income$low_income,poverty$poverty,ssi$ssi,pai$pai,
-                          insurance$no_insurance,employment$unemployed,enrollment$not_enrolled,
-                          vehicle$no_vehicle,commute$longer_commute)
+acsdf <- cbind.data.frame(age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+                          maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
+                          poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
+                          vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
 
 #Housing -
 # Read in the housing stock data
@@ -172,7 +170,10 @@ housingdf <- housingdf %>% select("Geography","not_available.x","not_available.y
 
 #Join the master dataset
 finaldf <- merge(acsdf,housingdf,by.x="age$id",by.y="Geography",all.x=TRUE)
-colnames(finaldf) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","hispanic","unmarried","single_parent","limited_english","low_income","poverty","ssi","pai","no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","no_water","no_sewer","no_gas","median_house_value","year_built")
+colnames(finaldf) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
+                      "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
+                      "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
+                      "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
 finaldf$id_type <- "census_tract"
 #write.csv(finaldf,"./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv",row.names = FALSE)
 
@@ -283,14 +284,13 @@ ownership$renters <- ownership$rented_est/(ownership$owned_est+ownership$rented_
 costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","grpi30_50_est","grpi50up_est") %>%
   filter(id_type=="highschool_district")
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
-costburden_burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
+costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
 
-acsdf <- cbind.data.frame(rep("highschool_district",nrow(age)),age$id,age$age_below_18,age$age_above_65,education$no_highschool,race$minority,
-                          ethnicity$hispanic,maritalstatus$unmarried,family$single_parent,
-                          language$limited_english,income$low_income,poverty$poverty,ssi$ssi,pai$pai,
-                          insurance$no_insurance,employment$unemployed,enrollment$not_enrolled,
-                          vehicle$no_vehicle,commute$longer_commute)
+acsdf <- cbind.data.frame(rep("highschool_district",nrow(age)),age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+                          maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
+                          poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
+                          vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
 
 #Housing -
 # Read in the housing stock data
@@ -332,7 +332,10 @@ housingdf <- cbind.data.frame(water$not_available,sewer$not_available,gas$not_av
 
 #Join the master dataset
 df <- cbind.data.frame(acsdf,housingdf)
-colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic","unmarried","single_parent","limited_english","low_income","poverty","ssi","pai","no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","no_water","no_sewer","no_gas","median_house_value","year_built")
+colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
+                 "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
+                 "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
+                 "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
 
 #df <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") 
 finaldf <- rbind.data.frame(finaldf,df)
@@ -446,14 +449,13 @@ ownership$renters <- ownership$rented_est/(ownership$owned_est+ownership$rented_
 costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","grpi30_50_est","grpi50up_est") %>%
   filter(id_type=="supervisor_district")
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
-costburden_burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
+costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
 
-acsdf <- cbind.data.frame(rep("supervisor_district",nrow(age)),age$id,age$age_below_18,age$age_above_65,education$no_highschool,race$minority,
-                          ethnicity$hispanic,maritalstatus$unmarried,family$single_parent,
-                          language$limited_english,income$low_income,poverty$poverty,ssi$ssi,pai$pai,
-                          insurance$no_insurance,employment$unemployed,enrollment$not_enrolled,
-                          vehicle$no_vehicle,commute$longer_commute)
+acsdf <- cbind.data.frame(rep("supervisor_district",nrow(age)),age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+                          maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
+                          poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
+                          vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
 
 #Housing -
 # Read in the housing stock data
@@ -495,7 +497,10 @@ housingdf <- cbind.data.frame(water$not_available,sewer$not_available,gas$not_av
 
 #Join the master dataset
 df <- cbind.data.frame(acsdf,housingdf)
-colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic","unmarried","single_parent","limited_english","low_income","poverty","ssi","pai","no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","no_water","no_sewer","no_gas","median_house_value","year_built")
+colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
+                 "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
+                 "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
+                 "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
 
 #data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") 
 finaldf <- rbind.data.frame(finaldf,df)
