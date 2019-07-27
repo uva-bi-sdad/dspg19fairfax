@@ -1,20 +1,24 @@
 library(psych)
 library(dplyr)
+library(naniar)
 
 #
 # Prepare data ----------------------------------------------------------------------------------------
 #
 
 # Read in data
-data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% select (-c(Geography, id_type)) %>% na.omit()
+data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>% filter(id_type == "census_tract")
+data <- data %>% select (-c(Geography, id_type))
+
 any(is.na(data))
+complete_case_pct(data) # 98% complete
 
 # Center and standardize
 datastd <- data.frame(scale(data, center = TRUE, scale = TRUE))
 describe(datastd)
 
 # Prepare correlation matrix
-cormat <- cor(datastd)
+cormat <- cor(datastd, use = "na.or.complete")
 
 
 #
@@ -56,7 +60,7 @@ fa.diagram(fact3, cut = 0.3)
 # Select indicators
 final <- datastd %>% select(no_insurance, no_highschool, hispanic, limited_english, poverty, single_parent, no_vehicle, minority, 
                             median_house_value, no_sewer, no_water)
-finalcormat <- cor(final)
+finalcormat <- cor(final, use = "na.or.complete")
 
 # FA
 finalfact <- fa(r = finalcormat, nfactors = 2, rotate = "varimax", fm = "pa")
