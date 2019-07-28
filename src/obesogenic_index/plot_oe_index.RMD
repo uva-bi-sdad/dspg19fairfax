@@ -103,7 +103,7 @@ fa.load     <- fact.mod$loadings %>%
                dplyr::select(variable, everything()) %>%
                rename(
                  food     = PA1,
-                 ses      = PA2,     #Hear you declare names of your factors
+                 ses      = PA2,     #Here you declare names of your factors
                  physical = PA3
                )
 
@@ -187,11 +187,12 @@ data.orig %>%
 #index_construct(f.weights = t(rep(1/3, 3)))
 
 ##Changes to factor loadings (weights)
+N <- nrow(fa.load)
 new.load <- tibble(
   variable = fa.load$variable,
-  food     = runif(13),
-  ses      = runif(13),
-  physical = runif(13)
+  food     = runif(N),
+  ses      = runif(N),
+  physical = runif(N)
 )
 
 #index_construct(var.weights = new.load)
@@ -349,7 +350,7 @@ obesogenic.result.df$ggplots
 
 Save figures for use later.  
 
-```{r echo = FALSE, eval = FALSE}
+```{r echo = FALSE, include = FALSE}
 for(i in 1:nrow(obesogenic.result.df)) {
   ggsave(sprintf("./src/obesogenic_index/figures/%s.jpg",
                  obesogenic.result.df$geography[i]),

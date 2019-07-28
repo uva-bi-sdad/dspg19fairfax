@@ -66,7 +66,7 @@ fa.load     <- fact.mod$loadings %>%
                dplyr::select(variable, everything()) %>%
                rename(
                  food     = PA1,
-                 ses      = PA2,     #Hear you declare names of your factors
+                 ses      = PA2,     #Here you declare names of your factors
                  physical = PA3
                )
 
