@@ -341,7 +341,7 @@ economic.result.df <- tibble(
   shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
   ggplots   = map2(.x = shp_files, 
                    .y = c("Census Tract", "Highschool District", "Supervisor District"),
-                   ~plot_index(.x, .y, "Obesogenic Environment"))
+                   ~plot_index(.x, .y, "Economic Vulnerability"))
 )
 ```
 
