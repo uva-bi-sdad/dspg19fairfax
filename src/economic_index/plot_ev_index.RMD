@@ -1,5 +1,5 @@
 ---
-title: "Visualizing Obesogenic Index Factor Analysis"
+title: "Visualizing Economic Vulnerability Index"
 author: "Quinton Neville"
 date: "7/26/2019"
 output:

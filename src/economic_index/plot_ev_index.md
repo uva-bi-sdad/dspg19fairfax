@@ -1,4 +1,4 @@
-Visualizing Obesogenic Index Factor Analysis
+Visualizing Economic Vulnerability Index
 ================
 Quinton Neville
 7/26/2019
