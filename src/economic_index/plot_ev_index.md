@@ -247,4 +247,18 @@ plot_index <- function(geo.shp    = census.df,
 
 Here, we generate the final results and subsequent visualizations. The user must define the weights (default loadings/prop. variance), where variables load, and to what unit of geography index construction is to occur.
 
+    ## [[1]]
+
+<img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
+
+    ## 
+    ## [[2]]
+
+<img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-2.png" width="90%" />
+
+    ## 
+    ## [[3]]
+
+<img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-3.png" width="90%" />
+
 Save figures for use later.

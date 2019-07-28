@@ -343,7 +343,9 @@ economic.result.df <- tibble(
                    .y = c("Census Tract", "Highschool District", "Supervisor District"),
                    ~plot_index(.x, .y, "Obesogenic Environment"))
 )
+```
 
+```{r echo = FALSE}
 economic.result.df$ggplots
 ```
 
