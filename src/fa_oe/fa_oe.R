@@ -78,7 +78,7 @@ fa.diagram(finalfact, cut = 0.3)
 factor1 <- final %>% select(no_insurance, no_highschool, hispanic, poverty)
 factor2 <- final %>% select(restaurant, fast_food, gas_station, supermarket, alcohol, convenience)
 factor3 <- final %>% select(team_sport, swimming_pool, playground)
-  
+
 psych::alpha(factor1) # alpha = 0.94
 psych::alpha(factor2) # alpha = 0.92
 psych::alpha(factor3) # alpha = 0.81
