@@ -62,7 +62,7 @@ ev.df <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority,
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water))
   ) %>% unnest() %>% 
@@ -76,7 +76,7 @@ ev.std <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority, 
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water)),
     data = data %>% map(.x = ., ~na.omit(.x) %>%
@@ -94,6 +94,7 @@ cor.mat  <- final.df %>%
             cor()
 
 fact.mod <- fa(r = cor.mat, nfactors = 2, rotate = "varimax", fm = "pa")
+fa.diagram(fact.mod)
 # Extract loadings and explained proportation
 fa.load     <- fact.mod$loadings %>% 
                unclass() %>%
@@ -103,7 +104,7 @@ fa.load     <- fact.mod$loadings %>%
                dplyr::select(variable, everything()) %>%
                rename(
                  ses    = PA1,
-                 living = PA2 #Here you declare names of your factors
+                 housing = PA2 #Here you declare names of your factors
                )
 
 fa.prop.var <- fact.mod$Vaccounted %>% unclass() %>% as_tibble() %>% slice(2)
@@ -113,7 +114,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 7), rep("living", 3))
+  factor  = c(rep("ses", 8), rep("housing", 3))
 )
 ```
 
@@ -164,7 +165,7 @@ score.df  <- factor.data %>%
 data.orig %>%
       filter(id_type == geo.type) %>%
       dplyr::select(geography, no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority,
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water) %>%
       na.omit() %>%
@@ -205,7 +206,7 @@ new.var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 7), rep("living", 3))
+  factor  = c(rep("ses", 8), rep("housing", 3))
 )
 
 #index_construct(factor.data = new.var.load)
@@ -304,7 +305,7 @@ Now, we create a function to plot the final index output onto a map of fairfax c
 ```{r warning = FALSE }
 plot_index <- function(geo.shp    = census.df, 
                        geo.type   = "Census Tract",
-                       index.name = "Obesogenic Environment") {
+                       index.name = "Economic Vulnerability") {
   
   geo.shp@data <- geo.shp@data %>% mutate(id = row.names(.))
   shp.df <- broom::tidy(geo.shp, region = "id")
@@ -322,9 +323,9 @@ plot_index <- function(geo.shp    = census.df,
 
 ```{r include = FALSE, warning = FALSE, message = FALSE, echo = FALSE, eval = FALSE}
 #TEST
-plot_index(census.shp    , "Census Tract", "Obesogenic Environment")
-plot_index(highschool.shp, "Census Tract", "Obesogenic Environment")
-plot_index(supervisor.shp, "Census Tract", "Obesogenic Environment")
+plot_index(census.shp    , "Census Tract", "Economic Vulnerability")
+plot_index(highschool.shp, "Census Tract", "Economic Vulnerability")
+plot_index(supervisor.shp, "Census Tract", "Economic Vulnerability")
 ```
 
 ##3. Results

@@ -24,7 +24,7 @@ ev.df <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority,
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water))
   ) %>% unnest() %>% 
@@ -38,7 +38,7 @@ ev.std <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority, 
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water)),
     data = data %>% map(.x = ., ~na.omit(.x) %>%
@@ -56,6 +56,7 @@ cor.mat  <- final.df %>%
             cor()
 
 fact.mod <- fa(r = cor.mat, nfactors = 2, rotate = "varimax", fm = "pa")
+fa.diagram(fact.mod)
 # Extract loadings and explained proportation
 fa.load     <- fact.mod$loadings %>% 
                unclass() %>%
@@ -65,7 +66,7 @@ fa.load     <- fact.mod$loadings %>%
                dplyr::select(variable, everything()) %>%
                rename(
                  ses    = PA1,
-                 living = PA2 #Here you declare names of your factors
+                 housing = PA2 #Here you declare names of your factors
                )
 
 fa.prop.var <- fact.mod$Vaccounted %>% unclass() %>% as_tibble() %>% slice(2)
@@ -75,7 +76,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 7), rep("living", 3))
+  factor  = c(rep("ses", 8), rep("housing", 3))
 )
 ```
 
@@ -126,7 +127,7 @@ score.df  <- factor.data %>%
 data.orig %>%
       filter(id_type == geo.type) %>%
       dplyr::select(geography, no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, 
+                                  hispanic, limited_english, poverty, minority,
                                   single_parent, no_vehicle, median_house_value,
                                   no_sewer, no_water) %>%
       na.omit() %>%
@@ -226,7 +227,7 @@ Now, we create a function to plot the final index output onto a map of fairfax c
 ``` r
 plot_index <- function(geo.shp    = census.df, 
                        geo.type   = "Census Tract",
-                       index.name = "Obesogenic Environment") {
+                       index.name = "Economic Vulnerability") {
   
   geo.shp@data <- geo.shp@data %>% mutate(id = row.names(.))
   shp.df <- broom::tidy(geo.shp, region = "id")
@@ -247,6 +248,27 @@ plot_index <- function(geo.shp    = census.df,
 
 Here, we generate the final results and subsequent visualizations. The user must define the weights (default loadings/prop. variance), where variables load, and to what unit of geography index construction is to occur.
 
+``` r
+#Call final results using functions defined above
+economic.result.df <- tibble(
+  geography = c("census_tract", "highschool_district", "supervisor_district"),
+  indices   = map(.x = geography, ~index_construct(geo.type = .x)),
+  shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
+  ggplots   = map2(.x = shp_files, 
+                   .y = c("Census Tract", "Highschool District", "Supervisor District"),
+                   ~plot_index(.x, .y, "Economic Vulnerability"))
+)
+}
+
+economic.result.df$ggplots
+
+#Save figures for later
+for(i in 1:nrow(economic.result.df)) {
+  ggsave(sprintf("./src/economic_index/figures/%s.jpg",
+                 economic.result.df$geography[i]),
+         economic.result.df$ggplots[[i]])
+}
+```
     ## [[1]]
 
 <img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
@@ -260,5 +282,3 @@ Here, we generate the final results and subsequent visualizations. The user must
     ## [[3]]
 
 <img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-3.png" width="90%" />
-
-Save figures for use later.
