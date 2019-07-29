@@ -57,7 +57,7 @@ obesity.df <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogeni
   mutate(
     data = map(data,
                ~.x %>%
-                 dplyr::select(-c(geography, minority, unmarried, single_parent, limited_english,
+                 dplyr::select(-c(geography, unmarried, single_parent, limited_english,
                                   low_income, not_enrolled, no_vehicle, long_commute)))
   ) %>% unnest() %>% 
   na.omit() %>% 
@@ -69,7 +69,7 @@ obesity.std <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogen
   mutate(
     data = map(data,
                ~.x %>%
-                 dplyr::select(-c(minority, unmarried, single_parent, limited_english,
+                 dplyr::select(-c(unmarried, single_parent, limited_english,
                                   low_income, not_enrolled, no_vehicle, long_commute))),
     data = data %>% map(.x = ., ~na.omit(.x) %>%
                           dplyr::select(-geography) %>%
@@ -81,7 +81,7 @@ obesity.std <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogen
 
 #Final Set
 final.df <- obesity.std %>%
-  dplyr::select(id_type, no_insurance, no_highschool,
+  dplyr::select(id_type, minority, no_insurance, no_highschool,
                 hispanic, poverty, restaurant,
                 fast_food, gas_station, supermarket, 
                 alcohol, convenience, no_swimming_pool,
@@ -114,7 +114,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 4), rep("food", 6), rep("physical", 3))
+  factor  = c(rep("ses", 5), rep("food", 6), rep("physical", 3))
 )
 ```
 
@@ -202,7 +202,7 @@ new.var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 3), rep("food", 5), rep("physical", 5))
+  factor  = c(rep("ses", 5), rep("food", 6), rep("physical", 3))
 )
 
 #index_construct(factor.data = new.var.load)

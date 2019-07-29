@@ -20,7 +20,7 @@ obesity.df <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogeni
   mutate(
     data = map(data,
                ~.x %>%
-                 dplyr::select(-c(geography, minority, unmarried, single_parent, limited_english,
+                 dplyr::select(-c(geography, unmarried, single_parent, limited_english,
                                   low_income, not_enrolled, no_vehicle, long_commute)))
   ) %>% unnest() %>% 
   na.omit() %>% 
@@ -32,7 +32,7 @@ obesity.std <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogen
   mutate(
     data = map(data,
                ~.x %>%
-                 dplyr::select(-c(minority, unmarried, single_parent, limited_english,
+                 dplyr::select(-c(unmarried, single_parent, limited_english,
                                   low_income, not_enrolled, no_vehicle, long_commute))),
     data = data %>% map(.x = ., ~na.omit(.x) %>%
                           dplyr::select(-geography) %>%
@@ -44,7 +44,7 @@ obesity.std <- read_rds("./data/working/Obesogenic_final_data/2019_7_28_obesogen
 
 #Final Set
 final.df <- obesity.std %>%
-  dplyr::select(id_type, no_insurance, no_highschool,
+  dplyr::select(id_type, minority, no_insurance, no_highschool,
                 hispanic, poverty, restaurant,
                 fast_food, gas_station, supermarket, 
                 alcohol, convenience, no_swimming_pool,
@@ -77,7 +77,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 4), rep("food", 6), rep("physical", 3))
+  factor  = c(rep("ses", 5), rep("food", 6), rep("physical", 3))
 )
 ```
 
@@ -245,6 +245,32 @@ plot_index <- function(geo.shp    = census.df,
 
 Here, we generate the final results and subsequent visualizations. The user must define the weights (default loadings/prop. variance), where variables load, and to what unit of geography index construction is to occur.
 
+``` r
+# Test
+plot_index(census.shp    , "Census Tract", "Obesogenic Environment")
+plot_index(highschool.shp, "Census Tract", "Obesogenic Environment")
+plot_index(supervisor.shp, "Census Tract", "Obesogenic Environment")
+
+#Call final results using functions defined above
+obesogenic.result.df <- tibble(
+  geography = c("census_tract", "highschool_district", "supervisor_district"),
+  indices   = map(.x = geography, ~index_construct(geo.type = .x)),
+  shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
+  ggplots   = map2(.x = shp_files, 
+                   .y = c("Census Tract", "Highschool District", "Supervisor District"),
+                   ~plot_index(.x, .y, "Obesogenic Environment"))
+)
+
+obesogenic.result.df$ggplots
+
+# Save
+for(i in 1:nrow(obesogenic.result.df)) {
+  ggsave(sprintf("./src/obesogenic_index/figures/%s.jpg",
+                 obesogenic.result.df$geography[i]),
+         obesogenic.result.df$ggplots[[i]])
+}
+```
+
     ## [[1]]
 
 <img src="plot_oe_index_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
@@ -259,4 +285,3 @@ Here, we generate the final results and subsequent visualizations. The user must
 
 <img src="plot_oe_index_files/figure-markdown_github/unnamed-chunk-10-3.png" width="90%" />
 
-Save figures for use later.
