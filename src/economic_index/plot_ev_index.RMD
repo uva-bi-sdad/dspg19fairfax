@@ -253,7 +253,7 @@ index_shp <- function(data = census.df, geo.type = "census_tract") {
     
   } else {
     
-    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp"),
+    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/new_file/Supervisor_Districts.shp"),
           data,
           by.x = "DISTRICT",
           by.y = "geography") %>%
