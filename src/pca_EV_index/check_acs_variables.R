@@ -15,7 +15,6 @@ knitr::opts_knit$set(echo = TRUE,
 # Census tracts -----------------------------------------------------------
 
 acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_07_16_acs_all_geography.csv")
-#acs.tidy.df <- read_csv("./data/working/ACS_joined_estimates/2019_06_24_acs_all_geography_tidy.csv")
 
 #1.Age
 age <- acs.df %>% select("id_type","id",starts_with("age")) %>% filter(id_type=="census_tract")
@@ -36,6 +35,9 @@ race <- acs.df %>% select("id_type","id","white_est","black_est",
                           "asian_est","other_est_y") %>% filter(id_type=="census_tract")
 race$SUM <- rowSums( race[ sapply(race, is.numeric)] )
 race$minority <- (race$black_est+race$asian_est+race$other_est_y)/race$SUM
+
+#3.5 Black
+race$black <- race$black_est/race$SUM
 
 #4.Ethnicity
 ethnicity <- acs.df %>% select("id_type","id","hispanic_est","nonhispanic_est") %>% filter(id_type=="census_tract")
@@ -122,7 +124,7 @@ costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","g
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
 costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
-acsdf <- cbind.data.frame(age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+acsdf <- cbind.data.frame(age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, race$black,ethnicity$hispanic,
                           maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
                           poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
                           vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
@@ -155,26 +157,32 @@ gas$not_available <- gas$`Gas not available`/(gas$`Gas available`+gas$`Gas conne
 #4.Housing value
 value <- housing %>% subset(select=c("Geography", "VALUE_TOTAL","NUM_UNITS")) %>% group_by(Geography) %>% na.omit()
 value$weighted_value <- value$VALUE_TOTAL/value$NUM_UNITS
-medvalue <- value %>% group_by(Geography)  %>%
-  summarise(Median = median(weighted_value), Count = n()) 
-#medvalue$norm <- (medvalue$Median-min(medvalue$Median))/(max(medvalue$Median)-min(medvalue$Median))
+value$less_than_mean <- ifelse(value$weighted_value<mean(value$weighted_value),1,0)
+value_pct <- value %>% group_by(Geography)  %>%
+  summarise(Low_value = sum(less_than_mean), Count = n()) %>%
+  mutate(Percentage = Low_value/Count)
+
 
 #5.Building age
 year <- housing %>% subset(select=c("Geography", "YEAR_BUILT")) %>%
-  group_by(Geography) %>% na.omit() %>%
-  summarise(Median = median(YEAR_BUILT), Count = n())
-#year$norm <- (year$Median-min(year$Median))/(max(year$Median)-min(year$Median))
+  group_by(Geography) %>% na.omit() 
+year$older_than_median <- ifelse(year$YEAR_BUILT<median(year$YEAR_BUILT),1,0)
+year_pct <- year %>% group_by(Geography)  %>%
+  summarise(Old_house = sum(older_than_median), Count = n()) %>%
+  mutate(Percentage = Old_house/Count)
 
-housingdf <- Reduce(function(x,y) merge(x,y,by="Geography",all=TRUE) ,list(water,sewer,gas,medvalue,year))
-housingdf <- housingdf %>% select("Geography","not_available.x","not_available.y","not_available","Median.x","Median.y")
 
-#Join the master dataset
-finaldf <- merge(acsdf,housingdf,by.x="age$id",by.y="Geography",all.x=TRUE)
-colnames(finaldf) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
+housingdf <- Reduce(function(x,y) merge(x,y,by="Geography",all=TRUE) ,list(water,sewer,gas,value_pct,year_pct))
+housingdf <- housingdf %>% select("Geography","not_available.x","not_available.y","not_available","Percentage.x","Percentage.y")
+
+
+#Join the first dataset
+finaldf1 <- merge(acsdf,housingdf,by.x="age$id",by.y="Geography",all.x=TRUE)
+colnames(finaldf1) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","black","hispanic",
                       "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
                       "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
                       "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
-finaldf$id_type <- "census_tract"
+finaldf1$id_type <- "census_tract"
 #write.csv(finaldf,"./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv",row.names = FALSE)
 
 
@@ -200,6 +208,9 @@ race <- acs.df %>% select("id_type","id","white_est","black_est",
                           "asian_est","other_est_y") %>% filter(id_type=="highschool_district")
 race$SUM <- rowSums( race[ sapply(race, is.numeric)] )
 race$minority <- (race$black_est+race$asian_est+race$other_est_y)/race$SUM
+
+#3.5 Black
+race$black <- race$black_est/race$SUM
 
 #4.Ethnicity
 ethnicity <- acs.df %>% select("id_type","id","hispanic_est","nonhispanic_est") %>% filter(id_type=="highschool_district")
@@ -286,11 +297,13 @@ costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","g
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
 costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
-
-acsdf <- cbind.data.frame(rep("highschool_district",nrow(age)),age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+acsdf <- cbind.data.frame(age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, race$black,ethnicity$hispanic,
                           maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
                           poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
                           vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
+new_label <- read.csv("./data/working/ACS_final_index_2/hs_relabel.csv")
+acsdf <- merge(new_label, acsdf, by.x="current_wrong_name", by.y="age$id")
+acsdf <- acsdf[,-1]
 
 #Housing -
 # Read in the housing stock data
@@ -317,33 +330,33 @@ gas$not_available <- gas$`Gas not available`/(gas$`Gas available`+gas$`Gas conne
 #4.Housing value
 value <- housing %>% subset(select=c("HIGHSCHOOL", "VALUE_TOTAL","NUM_UNITS")) %>% group_by(HIGHSCHOOL) %>% na.omit()
 value$weighted_value <- value$VALUE_TOTAL/value$NUM_UNITS
-medvalue <- value %>% group_by(HIGHSCHOOL)  %>%
-  summarise(Median = median(weighted_value), Count = n()) 
-#medvalue$norm <- (medvalue$Median-min(medvalue$Median))/(max(medvalue$Median)-min(medvalue$Median))
+value$less_than_mean <- ifelse(value$weighted_value<mean(value$weighted_value),1,0)
+value_pct <- value %>% group_by(HIGHSCHOOL)  %>%
+  summarise(Low_value = sum(less_than_mean), Count = n()) %>%
+  mutate(Percentage = Low_value/Count)
+
 
 #5.Building age
 year <- housing %>% subset(select=c("HIGHSCHOOL", "YEAR_BUILT")) %>%
-  group_by(HIGHSCHOOL) %>% na.omit() %>%
-  summarise(Median = median(YEAR_BUILT), Count = n())
-#year$norm <- (year$Median-min(year$Median))/(max(year$Median)-min(year$Median))
+  group_by(HIGHSCHOOL) %>% na.omit() 
+year$older_than_median <- ifelse(year$YEAR_BUILT<median(year$YEAR_BUILT),1,0)
+year_pct <- year %>% group_by(HIGHSCHOOL)  %>%
+  summarise(Old_house = sum(older_than_median), Count = n()) %>%
+  mutate(Percentage = Old_house/Count)
 
 
-housingdf <- cbind.data.frame(water$not_available,sewer$not_available,gas$not_available,medvalue$Median,year$Median)
+housingdf <- cbind.data.frame(water$HIGHSCHOOL,water$not_available,sewer$not_available,gas$not_available,value_pct$Percentage,year_pct$Percentage)
 
-#Join the master dataset
-df <- cbind.data.frame(acsdf,housingdf)
-colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
-                 "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
-                 "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
-                 "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
 
-#df <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") 
-finaldf <- rbind.data.frame(finaldf,df)
-#write.csv(finaldf,"./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv")
-
+#Join the second dataset
+finaldf2 <- merge(acsdf,housingdf,by.x="correct_relabeled_name",by.y="water$HIGHSCHOOL",all.x=TRUE)
+colnames(finaldf2) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","black","hispanic",
+                      "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
+                      "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
+                      "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
+finaldf2$id_type <- "highschool_district"
 
 # Supervisor districts ----------------------------------------------------
-
 acs.df <- read_csv("./data/working/ACS_joined_estimates/2019_07_16_acs_all_geography.csv")
 
 #1.Age
@@ -365,6 +378,9 @@ race <- acs.df %>% select("id_type","id","white_est","black_est",
                           "asian_est","other_est_y") %>% filter(id_type=="supervisor_district")
 race$SUM <- rowSums( race[ sapply(race, is.numeric)] )
 race$minority <- (race$black_est+race$asian_est+race$other_est_y)/race$SUM
+
+#3.5 Black
+race$black <- race$black_est/race$SUM
 
 #4.Ethnicity
 ethnicity <- acs.df %>% select("id_type","id","hispanic_est","nonhispanic_est") %>% filter(id_type=="supervisor_district")
@@ -451,11 +467,13 @@ costburden <- acs.df %>% select("id_type","id","grpi0_15_est","grpi15_30_est","g
 costburden$SUM <- rowSums(costburden[ sapply(costburden, is.numeric)] )
 costburden$burdened <- (costburden$grpi30_50_est+costburden$grpi50up_est)/costburden$SUM
 
-
-acsdf <- cbind.data.frame(rep("supervisor_district",nrow(age)),age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, ethnicity$hispanic,
+acsdf <- cbind.data.frame(age$id, age$age_below_18, age$age_above_65, education$no_highschool, race$minority, race$black,ethnicity$hispanic,
                           maritalstatus$unmarried, family$single_parent, language$limited_english, income$low_income,
                           poverty$poverty, ssi$ssi, pai$pai, insurance$no_insurance, employment$unemployed, enrollment$not_enrolled,
                           vehicle$no_vehicle, commute$longer_commute, ownership$renters, costburden$burdened)
+new_label <- read.csv("./data/working/ACS_final_index_2/district_relabel.csv")
+acsdf <- merge(new_label, acsdf, by.x="current_wrong_name", by.y="age$id")
+acsdf <- acsdf[,-1]
 
 #Housing -
 # Read in the housing stock data
@@ -482,26 +500,30 @@ gas$not_available <- gas$`Gas not available`/(gas$`Gas available`+gas$`Gas conne
 #4.Housing value
 value <- housing %>% subset(select=c("DISTRICT", "VALUE_TOTAL","NUM_UNITS")) %>% group_by(DISTRICT) %>% na.omit()
 value$weighted_value <- value$VALUE_TOTAL/value$NUM_UNITS
-medvalue <- value %>% group_by(DISTRICT)  %>%
-  summarise(Median = median(weighted_value), Count = n()) 
-#medvalue$norm <- (medvalue$Median-min(medvalue$Median))/(max(medvalue$Median)-min(medvalue$Median))
+value$less_than_mean <- ifelse(value$weighted_value<mean(value$weighted_value),1,0)
+value_pct <- value %>% group_by(DISTRICT)  %>%
+  summarise(Low_value = sum(less_than_mean), Count = n()) %>%
+  mutate(Percentage = Low_value/Count)
+
 
 #5.Building age
 year <- housing %>% subset(select=c("DISTRICT", "YEAR_BUILT")) %>%
-  group_by(DISTRICT) %>% na.omit() %>%
-  summarise(Median = median(YEAR_BUILT), Count = n())
-#year$norm <- (year$Median-min(year$Median))/(max(year$Median)-min(year$Median))
+  group_by(DISTRICT) %>% na.omit() 
+year$older_than_median <- ifelse(year$YEAR_BUILT<median(year$YEAR_BUILT),1,0)
+year_pct <- year %>% group_by(DISTRICT)  %>%
+  summarise(Old_house = sum(older_than_median), Count = n()) %>%
+  mutate(Percentage = Old_house/Count)
 
+housingdf <- cbind.data.frame(water$DISTRICT,water$not_available,sewer$not_available,gas$not_available,value_pct$Percentage,year_pct$Percentage)
 
-housingdf <- cbind.data.frame(water$not_available,sewer$not_available,gas$not_available,medvalue$Median,year$Median)
+#Join the third dataset
+finaldf3 <- merge(acsdf,housingdf,by.x="correct_relabeled_name",by.y="water$DISTRICT",all.x=TRUE)
+colnames(finaldf3) <-c("Geography","age_below_18","age_above_65","no_highschool","minority","black","hispanic",
+                       "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
+                       "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
+                       "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
+finaldf3$id_type <- "supervisor_district"
 
-#Join the master dataset
-df <- cbind.data.frame(acsdf,housingdf)
-colnames(df) <-c("id_type","Geography","age_below_18","age_above_65","no_highschool","minority","hispanic",
-                 "unmarried","single_parent","limited_english","low_income","poverty","ssi","pai",
-                 "no_insurance","unemployed","not_enrolled","no_vehicle","long_commute","renters",
-                 "burdened", "no_water","no_sewer","no_gas","median_house_value","year_built")
-
-#data <- read.csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") 
-finaldf <- rbind.data.frame(finaldf,df)
+#Make the master dataset
+finaldf <- rbind.data.frame(finaldf1,finaldf2,finaldf3)
 write.csv(finaldf,"./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv",row.names = FALSE)

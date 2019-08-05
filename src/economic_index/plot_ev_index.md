@@ -57,6 +57,11 @@ cor.mat  <- final.df %>%
 
 fact.mod <- fa(r = cor.mat, nfactors = 2, rotate = "varimax", fm = "pa")
 fa.diagram(fact.mod)
+```
+
+<img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-1-1.png" width="90%" />
+
+``` r
 # Extract loadings and explained proportation
 fa.load     <- fact.mod$loadings %>% 
                unclass() %>%
@@ -183,7 +188,7 @@ index_shp <- function(data = census.df, geo.type = "census_tract") {
     
   } else {
     
-    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp"),
+    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/new_file/Supervisor_Districts.shp"),
           data,
           by.x = "DISTRICT",
           by.y = "geography") %>%
@@ -248,27 +253,6 @@ plot_index <- function(geo.shp    = census.df,
 
 Here, we generate the final results and subsequent visualizations. The user must define the weights (default loadings/prop. variance), where variables load, and to what unit of geography index construction is to occur.
 
-``` r
-#Call final results using functions defined above
-economic.result.df <- tibble(
-  geography = c("census_tract", "highschool_district", "supervisor_district"),
-  indices   = map(.x = geography, ~index_construct(geo.type = .x)),
-  shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
-  ggplots   = map2(.x = shp_files, 
-                   .y = c("Census Tract", "Highschool District", "Supervisor District"),
-                   ~plot_index(.x, .y, "Economic Vulnerability"))
-)
-}
-
-economic.result.df$ggplots
-
-#Save figures for later
-for(i in 1:nrow(economic.result.df)) {
-  ggsave(sprintf("./src/economic_index/figures/%s.jpg",
-                 economic.result.df$geography[i]),
-         economic.result.df$ggplots[[i]])
-}
-```
     ## [[1]]
 
 <img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-1.png" width="90%" />
@@ -282,3 +266,5 @@ for(i in 1:nrow(economic.result.df)) {
     ## [[3]]
 
 <img src="plot_ev_index_files/figure-markdown_github/unnamed-chunk-10-3.png" width="90%" />
+
+Save figures for use later.
