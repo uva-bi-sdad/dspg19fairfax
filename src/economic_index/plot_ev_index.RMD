@@ -62,9 +62,8 @@ ev.df <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, minority,
-                                  single_parent, no_vehicle, median_house_value,
-                                  no_sewer, no_water))
+                                  hispanic, limited_english, poverty, black,
+                                  single_parent, no_vehicle, burdened))
   ) %>% unnest() %>% 
   na.omit()
 
@@ -76,9 +75,8 @@ ev.std <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final
     data = map(data,
                ~.x %>%
                  dplyr::select(no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, minority, 
-                                  single_parent, no_vehicle, median_house_value,
-                                  no_sewer, no_water)),
+                                  hispanic, limited_english, poverty, black,
+                                  single_parent, no_vehicle, burdened)),
     data = data %>% map(.x = ., ~na.omit(.x) %>%
                           mutate_if(is.numeric, function(x) {
                             (x - mean(x))/sd(x)}))
@@ -93,8 +91,8 @@ cor.mat  <- final.df %>%
             dplyr::select(-id_type) %>%
             cor()
 
-fact.mod <- fa(r = cor.mat, nfactors = 2, rotate = "varimax", fm = "pa")
-fa.diagram(fact.mod)
+fact.mod <- fa(r = cor.mat, nfactors = 1, rotate = "varimax", fm = "pa")
+# fa.diagram(fact.mod)
 # Extract loadings and explained proportation
 fa.load     <- fact.mod$loadings %>% 
                unclass() %>%
@@ -103,8 +101,8 @@ fa.load     <- fact.mod$loadings %>%
                                           dplyr::select(-id_type))) %>%
                dplyr::select(variable, everything()) %>%
                rename(
-                 ses    = PA1,
-                 housing = PA2 #Here you declare names of your factors
+                 vulnerability    = PA1 #,
+                 # housing = PA2 #Here you declare names of your factors if you have additional ones
                )
 
 fa.prop.var <- fact.mod$Vaccounted %>% unclass() %>% as_tibble() %>% slice(2)
@@ -114,7 +112,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 8), rep("housing", 3))
+  factor  = c(rep("vulnerability", 9))
 )
 ```
 
@@ -165,9 +163,8 @@ score.df  <- factor.data %>%
 data.orig %>%
       filter(id_type == geo.type) %>%
       dplyr::select(geography, no_insurance, no_highschool, 
-                                  hispanic, limited_english, poverty, minority,
-                                  single_parent, no_vehicle, median_house_value,
-                                  no_sewer, no_water) %>%
+                                  hispanic, limited_english, poverty, black,
+                                  single_parent, no_vehicle, burdened) %>%
       na.omit() %>%
       dplyr::select(geography) %>%
       mutate(
@@ -206,7 +203,7 @@ new.var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 8), rep("housing", 3))
+  factor  = c(rep("vulnerability", 9)) #, rep("housing", 3)) if you have additional ones
 )
 
 #index_construct(factor.data = new.var.load)
@@ -253,7 +250,7 @@ index_shp <- function(data = census.df, geo.type = "census_tract") {
     
   } else {
     
-    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/new_file/Supervisor_Districts.shp"),
+    merge(readOGR("./data/original/Fairfax_Geographies/Supervisor_Districts/Supervisor_Districts.shp"),
           data,
           by.x = "DISTRICT",
           by.y = "geography") %>%
@@ -324,8 +321,8 @@ plot_index <- function(geo.shp    = census.df,
 ```{r include = FALSE, warning = FALSE, message = FALSE, echo = FALSE, eval = FALSE}
 #TEST
 plot_index(census.shp    , "Census Tract", "Economic Vulnerability")
-plot_index(highschool.shp, "Census Tract", "Economic Vulnerability")
-plot_index(supervisor.shp, "Census Tract", "Economic Vulnerability")
+plot_index(highschool.shp, "High School Attendance Area", "Economic Vulnerability")
+plot_index(supervisor.shp, "Supervisor District", "Economic Vulnerability")
 ```
 
 ##3. Results
@@ -341,7 +338,7 @@ economic.result.df <- tibble(
   indices   = map(.x = geography, ~index_construct(geo.type = .x)),
   shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
   ggplots   = map2(.x = shp_files, 
-                   .y = c("Census Tract", "Highschool District", "Supervisor District"),
+                   .y = c("Census Tract", "High School Attendance Area", "Supervisor District"),
                    ~plot_index(.x, .y, "Economic Vulnerability"))
 )
 ```

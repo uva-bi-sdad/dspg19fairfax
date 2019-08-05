@@ -9,6 +9,9 @@ library(ggthemes)
 library(gridExtra)
 library(grid)
 library(ggpubr)
+library(stringr)
+library(purrr)
+library(rgdal)
 
 #
 # Prepare --------------------------------------------------------------------------------------------------------
@@ -96,7 +99,7 @@ ggplot(test, aes(x = reorder(DISTRICT, -no_swimming_pool), y = no_swimming_pool)
   theme_classic() +
   theme(title = element_text(size = 14, face="bold"),
         axis.title = element_text(size = 12, face="bold"),
-        axis.text = element_text(size = 12)
+        axis.text = element_text(size = 12),
         axis.ticks.length = unit(3, "pt")
   )
 
