@@ -81,7 +81,7 @@ obesity.std <- read_rds("./data/working/Obesogenic_final_data/2019_8_04_obesogen
 
 #Final Set
 final.df <- obesity.std %>%
-  dplyr::select(id_type, no_insurance, no_highschool,
+  dplyr::select(id_type, no_insurance, hispanic, no_highschool,
                 black, poverty, restaurant,
                 fast_food, gas_station, supermarket, 
                 alcohol, convenience, no_swimming_pool,
@@ -101,14 +101,14 @@ print(fact.mod$loadings, cutoff = 0.3)
 
 #Extract Cronbach's Alpha  
 # Calculate internal consistency
-factor1 <- final.df %>% dplyr::select(no_insurance, no_highschool, black, poverty)
+factor1 <- final.df %>% dplyr::select(no_insurance, no_highschool, hispanic, black, poverty)
 factor2 <- final.df %>% dplyr::select(restaurant, fast_food, gas_station,
                                          supermarket, alcohol, convenience)
 factor3 <- final.df %>% dplyr::select(no_team_sport, no_swimming_pool, no_playground)
 
-psych::alpha(factor1) # alpha = 0.84 (CI no 80), improves to .91 if black is dropped 
-psych::alpha(factor2) # alpha = 0.92 (CI no 80), no improve drop
-psych::alpha(factor3) # alpha = 0.82, no improve drop (CI does contain 80)
+psych::alpha(factor1) # alpha = 0.89 
+psych::alpha(factor2) # alpha = 0.92 
+psych::alpha(factor3) # alpha = 0.82
 
 
 # Extract loadings and explained proportation
@@ -131,7 +131,7 @@ var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 4), rep("food", 6), rep("physical", 3))
+  factor  = c(rep("ses", 5), rep("food", 6), rep("physical", 3))
 )
 ```
 
@@ -219,7 +219,7 @@ new.var.load <- tibble(
   variable = colnames(final.df %>%
                        dplyr::select_if(is.numeric)) %>%
                        str_c(),
-  factor  = c(rep("ses", 3), rep("food", 5), rep("physical", 5))
+  factor  = c(rep("ses", 5), rep("food", 6), rep("physical", 3))
 )
 
 #index_construct(factor.data = new.var.load)
@@ -337,8 +337,8 @@ plot_index <- function(geo.shp    = census.df,
 ```{r include = FALSE, warning = FALSE, message = FALSE, echo = FALSE, eval = FALSE}
 #TEST
 plot_index(census.shp    , "Census Tract", "Obesogenic Environment")
-plot_index(highschool.shp, "Census Tract", "Obesogenic Environment")
-plot_index(supervisor.shp, "Census Tract", "Obesogenic Environment")
+plot_index(highschool.shp, "High School Attendance Area", "Obesogenic Environment")
+plot_index(supervisor.shp, "Supervisor District", "Obesogenic Environment")
 ```
 
 ##3. Results
@@ -354,7 +354,7 @@ obesogenic.result.df <- tibble(
   indices   = map(.x = geography, ~index_construct(geo.type = .x)),
   shp_files = map2(.x = indices, .y = geography, ~index_shp(.x, .y)),
   ggplots   = map2(.x = shp_files, 
-                   .y = c("Census Tract", "Highschool District", "Supervisor District"),
+                   .y = c("Census Tract", "High School Attendance Area", "Supervisor District"),
                    ~plot_index(.x, .y, "Obesogenic Environment"))
 )
 ```
