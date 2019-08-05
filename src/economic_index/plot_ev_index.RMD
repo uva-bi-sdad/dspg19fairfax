@@ -46,6 +46,8 @@ options(scipen = 5)
 
 Here, we read in the necessary data for our specific index, scale, fit the desired $k$-factor model, extract the loadings (variable weights), extract the proportion of total variance explained by each factor/dimension (factor weights), and define which factors load where for our composite index construction.  
 
+Because there is only 1 factor in this case, the default weight is 1. Otherwise, it is proportion variance explained as obtained by the commented-out code below.
+
 ```{r message = FALSE, warning = FALSE}
 #Read data original data for labels
 data.orig <- read_csv("./data/working/ACS_final_index_2/07_22_2019_joined_acs_final.csv") %>%
@@ -105,7 +107,8 @@ fa.load     <- fact.mod$loadings %>%
                  # housing = PA2 #Here you declare names of your factors if you have additional ones
                )
 
-fa.prop.var <- fact.mod$Vaccounted %>% unclass() %>% as_tibble() %>% slice(2)
+# Because there is only 1 factor, the default weight for factors is 1. Otherwise, it is proportion variance explained as obtained by the commented-out code below. 
+fa.prop.var <- 1 # fact.mod$Vaccounted %>% unclass() %>% as_tibble() %>% slice(4)
 
 #Declare Which Variables load on which Factors (your input
 var.load <- tibble(
