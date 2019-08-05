@@ -127,10 +127,10 @@ obesity.df %>%
 
 ```{r eval = FALSE, echo = FALSE}
 #Write out a final .csv and nested .RDS object
-write_csv(obesity.df, "./data/working/Obesogenic_final_data/2019_7_28_obesogenic_final.csv")
+write_csv(obesity.df, "./data/working/Obesogenic_final_data/2019_8_04_obesogenic_final.csv")
 obesity.df %>% 
   nest(-id_type) %>%
-  write_rds(., "./data/working/Obesogenic_final_data/2019_7_28_obesogenic_final_nested.RDS")
+  write_rds(., "./data/working/Obesogenic_final_data/2019_8_04_obesogenic_final_nested.RDS")
 ```
 
 Here we were very meticulous about making sure everything is matched, aggregated, and assigned to the right geographic unit. After joining three seperate data sets, Fairfax Housing, OSM, and ACS; we have our final working Obesogenic Environment data (stored in the `"./data/working/Obesogenic_final_data/"` folder). Note that three observations are missing census tracts but are not missing supervisor or highschool district, while three census tracts are not present at all, thus there are three fewer total observations than in the original ACS units of geography (due to the three missing census tracts, as verified in the table above).  
